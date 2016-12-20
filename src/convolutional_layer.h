@@ -28,6 +28,9 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
 void denormalize_convolutional_layer(convolutional_layer l);
 void resize_convolutional_layer(convolutional_layer *layer, int w, int h);
 void forward_convolutional_layer(const convolutional_layer layer, network_state state);
+#ifdef NNPACK
+void forward_convolutional_layer_nnpack(const convolutional_layer layer, network_state state);
+#endif
 void update_convolutional_layer(convolutional_layer layer, int batch, float learning_rate, float momentum, float decay);
 image *visualize_convolutional_layer(convolutional_layer layer, char *window, image *prev_weights);
 void binarize_weights(float *weights, int n, int size, float *binary);

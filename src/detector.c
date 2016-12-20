@@ -1,3 +1,7 @@
+#ifdef NNPACK
+#include <nnpack.h>
+#endif
+#include <sys/time.h>
 #include "network.h"
 #include "region_layer.h"
 #include "cost_layer.h"
@@ -449,11 +453,13 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     }
     set_batch_network(&net, 1);
     srand(2222222);
-    clock_t time;
+	struct timeval start, stop;
     char buff[256];
     char *input = buff;
     int j;
     float nms=.4;
+	nnp_initialize();
+
     while(1){
         if(filename){
             strncpy(input, filename, 256);
@@ -473,11 +479,12 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = calloc(l.classes, sizeof(float *));
 
         float *X = sized.data;
-        time=clock();
+		gettimeofday(&start, 0);
         network_predict(net, X);
-        printf("%s: Predicted in %f seconds.\n", input, sec(clock()-time));
+		gettimeofday(&stop, 0);
+		printf("%s: Predicted in %ld ms.\n", input, (stop.tv_sec * 1000 + stop.tv_usec / 1000) - (start.tv_sec * 1000 + start.tv_usec / 1000));
         get_region_boxes(l, 1, 1, thresh, probs, boxes, 0, 0);
-        if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+		if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         draw_detections(im, l.w*l.h*l.n, thresh, boxes, probs, names, alphabet, l.classes);
         save_image(im, "predictions");
         show_image(im, "predictions");
@@ -492,6 +499,8 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
 #endif
         if (filename) break;
     }
+
+	nnp_deinitialize();
 }
 
 void run_detector(int argc, char **argv)

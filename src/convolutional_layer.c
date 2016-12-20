@@ -7,6 +7,9 @@
 #include "gemm.h"
 #include <stdio.h>
 #include <time.h>
+#ifdef NNPACK
+#include <nnpack.h>
+#endif
 
 #ifdef AI2
 #include "xnor_layer.h"
@@ -208,8 +211,11 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
 
     l.output = calloc(l.batch*l.outputs, sizeof(float));
     l.delta  = calloc(l.batch*l.outputs, sizeof(float));
-
-    l.forward = forward_convolutional_layer;
+#ifdef NNPACK
+	l.forward = forward_convolutional_layer_nnpack;
+#else
+	l.forward = forward_convolutional_layer;
+#endif
     l.backward = backward_convolutional_layer;
     l.update = update_convolutional_layer;
     if(binary){
@@ -424,6 +430,46 @@ void backward_bias(float *bias_updates, float *delta, int batch, int n, int size
     }
 }
 
+#ifdef NNPACK
+void forward_convolutional_layer_nnpack(convolutional_layer l, network_state state)
+{
+	struct nnp_size input_size = { l.w, l.h };
+	struct nnp_padding input_padding = { l.pad, l.pad, l.pad, l.pad };
+	struct nnp_size kernel_size = { l.size, l.size };
+	struct nnp_size stride = { l.stride, l.stride };
+	pthreadpool_t threadpool = pthreadpool_create(4);
+
+	nnp_convolution_inference(
+		nnp_convolution_algorithm_implicit_gemm,
+		nnp_convolution_transform_strategy_tuple_based,
+		l.c,
+		l.n,
+		input_size,
+		input_padding,
+		kernel_size,
+		stride,
+		state.input,
+		l.weights,
+		NULL,
+		l.output,
+		threadpool,
+		NULL
+	);
+
+	if(l.batch_normalize){
+		forward_batchnorm_layer(l, state);
+	}
+
+	int out_h = convolutional_out_height(l);
+	int out_w = convolutional_out_width(l);
+	int n = out_h*out_w;
+
+	add_bias(l.output, l.biases, l.batch, l.n, out_h*out_w);
+	activate_array(l.output, l.n*n*l.batch, l.activation);
+	if(l.binary || l.xnor) swap_binary(&l);
+}
+#endif
+
 void forward_convolutional_layer(convolutional_layer l, network_state state)
 {
     int out_h = convolutional_out_height(l);
@@ -432,17 +478,16 @@ void forward_convolutional_layer(convolutional_layer l, network_state state)
 
     fill_cpu(l.outputs*l.batch, 0, l.output, 1);
 
-    if(l.xnor){
+	if(l.xnor){
         binarize_weights(l.weights, l.n, l.c*l.size*l.size, l.binary_weights);
         swap_binary(&l);
         binarize_cpu(state.input, l.c*l.h*l.w*l.batch, l.binary_input);
         state.input = l.binary_input;
     }
 
-    int m = l.n;
-    int k = l.size*l.size*l.c;
-    int n = out_h*out_w;
-
+	int m = l.n; // output channel
+	int k = l.size*l.size*l.c; // kernel size, input channel
+	int n = out_h*out_w; // output size
 
     float *a = l.weights;
     float *b = state.workspace;
