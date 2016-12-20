@@ -459,7 +459,9 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     char *input = buff;
     int j;
     float nms=.4;
+#ifdef NNPACK
 	nnp_initialize();
+#endif
 
     while(1){
         if(filename){
@@ -500,8 +502,9 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
 #endif
         if (filename) break;
     }
-
-	nnp_deinitialize();
+#ifdef NNPACK
+	nnp_initialize();
+#endif
 }
 
 void play_detector(char *datacfg, char *cfgfile, char *weightfile, char *path, float thresh)
