@@ -2,6 +2,7 @@
 #include <nnpack.h>
 #endif
 #include <sys/time.h>
+#include <dirent.h>
 #include "network.h"
 #include "region_layer.h"
 #include "cost_layer.h"
@@ -503,6 +504,69 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
 	nnp_deinitialize();
 }
 
+void play_detector(char *datacfg, char *cfgfile, char *weightfile, char *path, float thresh)
+{
+	list *options = read_data_cfg(datacfg);
+	char *name_list = option_find_str(options, "names", "data/names.list");
+	char **names = get_labels(name_list);
+
+	image **alphabet = load_alphabet();
+	network net = parse_network_cfg(cfgfile);
+	if(weightfile){
+		load_weights(&net, weightfile);
+	}
+	set_batch_network(&net, 1);
+	srand(2222222);
+	struct timeval start, stop;
+	char buff[256];
+	char *input = buff;
+	int j;
+	float nms=.4;
+
+	layer l = net.layers[net.n-1];
+	box *boxes = calloc(l.w*l.h*l.n, sizeof(box));
+	float **probs = calloc(l.w*l.h*l.n, sizeof(float *));
+	for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = calloc(l.classes, sizeof(float *));
+#ifdef NNPACK
+	nnp_initialize();
+#endif
+
+	struct dirent **namelist;
+	int n = scandir(path, &namelist, 0, alphasort);
+	int i;
+	for (i = 0; i < n; i++) {
+		if (!strstr(namelist[i]->d_name, ".jpg")) continue;
+		sprintf(input, "%s/%s", path, namelist[i]->d_name);
+
+		image im = load_image_color(input,0,0);
+		image sized = resize_image(im, net.w, net.h);
+
+		float *X = sized.data;
+		gettimeofday(&start, 0);
+		network_predict(net, X);
+		gettimeofday(&stop, 0);
+		printf("%s: Predicted in %ld ms.\n", input, (stop.tv_sec * 1000 + stop.tv_usec / 1000) - (start.tv_sec * 1000 + start.tv_usec / 1000));
+		get_region_boxes(l, 1, 1, thresh, probs, boxes, 0, 0);
+		if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+		draw_detections(im, l.w*l.h*l.n, thresh, boxes, probs, names, alphabet, l.classes);
+		show_image(im, "predictions");
+
+		free_image(im);
+		free_image(sized);
+#ifdef OPENCV
+		cvWaitKey(0);
+		cvDestroyAllWindows();
+#endif
+		free(namelist[i]);
+	}
+	free(namelist);
+#ifdef NNPACK
+	nnp_deinitialize();
+#endif
+	free(boxes);
+	free_ptrs((void **)probs, l.w*l.h*l.n);
+}
+
 void run_detector(int argc, char **argv)
 {
     char *prefix = find_char_arg(argc, argv, "-prefix", 0);
@@ -543,6 +607,7 @@ void run_detector(int argc, char **argv)
     char *weights = (argc > 5) ? argv[5] : 0;
     char *filename = (argc > 6) ? argv[6]: 0;
     if(0==strcmp(argv[2], "test")) test_detector(datacfg, cfg, weights, filename, thresh);
+	else if(0==strcmp(argv[2], "play")) play_detector(datacfg, cfg, weights, filename, thresh);
     else if(0==strcmp(argv[2], "train")) train_detector(datacfg, cfg, weights, gpus, ngpus, clear);
     else if(0==strcmp(argv[2], "valid")) validate_detector(datacfg, cfg, weights);
     else if(0==strcmp(argv[2], "recall")) validate_detector_recall(cfg, weights);
