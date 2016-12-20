@@ -1,6 +1,3 @@
-#ifdef NNPACK
-#include <nnpack.h>
-#endif
 #include <sys/time.h>
 #include <dirent.h>
 #include "network.h"
@@ -461,6 +458,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     float nms=.4;
 #ifdef NNPACK
 	nnp_initialize();
+	net.threadpool = pthreadpool_create(4);
 #endif
 
     while(1){
@@ -503,6 +501,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         if (filename) break;
     }
 #ifdef NNPACK
+	pthreadpool_destroy(net.threadpool);
 	nnp_initialize();
 #endif
 }
@@ -532,6 +531,7 @@ void play_detector(char *datacfg, char *cfgfile, char *weightfile, char *path, f
 	for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = calloc(l.classes, sizeof(float *));
 #ifdef NNPACK
 	nnp_initialize();
+	net.threadpool = pthreadpool_create(4);
 #endif
 
 	struct dirent **namelist;
@@ -557,13 +557,13 @@ void play_detector(char *datacfg, char *cfgfile, char *weightfile, char *path, f
 		free_image(im);
 		free_image(sized);
 #ifdef OPENCV
-		cvWaitKey(0);
-		cvDestroyAllWindows();
+		cvWaitKey(1);
 #endif
 		free(namelist[i]);
 	}
 	free(namelist);
 #ifdef NNPACK
+	pthreadpool_destroy(net.threadpool);
 	nnp_deinitialize();
 #endif
 	free(boxes);

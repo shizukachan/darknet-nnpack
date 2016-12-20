@@ -2,6 +2,9 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
+#ifdef NNPACK
+#include <nnpack.h>
+#endif
 #include "image.h"
 #include "layer.h"
 #include "data.h"
@@ -55,10 +58,14 @@ typedef struct network{
     int gpu_index;
     tree *hierarchy;
 
-    #ifdef GPU
+#ifdef GPU
     float **input_gpu;
     float **truth_gpu;
-    #endif
+#endif
+
+#ifdef NNPACK
+	pthreadpool_t threadpool;
+#endif
 } network;
 
 typedef struct network_state {

@@ -7,9 +7,6 @@
 #include "gemm.h"
 #include <stdio.h>
 #include <time.h>
-#ifdef NNPACK
-#include <nnpack.h>
-#endif
 
 #ifdef AI2
 #include "xnor_layer.h"
@@ -437,7 +434,6 @@ void forward_convolutional_layer_nnpack(convolutional_layer l, network_state sta
 	struct nnp_padding input_padding = { l.pad, l.pad, l.pad, l.pad };
 	struct nnp_size kernel_size = { l.size, l.size };
 	struct nnp_size stride = { l.stride, l.stride };
-	pthreadpool_t threadpool = pthreadpool_create(4);
 
 	nnp_convolution_inference(
 		nnp_convolution_algorithm_implicit_gemm,
@@ -452,7 +448,7 @@ void forward_convolutional_layer_nnpack(convolutional_layer l, network_state sta
 		l.weights,
 		NULL,
 		l.output,
-		threadpool,
+		state.net.threadpool,
 		NULL
 	);
 
