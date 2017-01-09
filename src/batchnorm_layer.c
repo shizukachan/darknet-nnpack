@@ -119,6 +119,24 @@ void resize_batchnorm_layer(layer *layer, int w, int h)
     fprintf(stderr, "Not implemented\n");
 }
 
+#ifdef NNPACK
+struct normalize_params {
+	float *x;
+	float *mean;
+	float *variance;
+	int spatial;
+};
+
+void normalize_cpu_thread(struct normalize_params *params, size_t batch, size_t filters)
+{
+	int i;
+	for(i = 0; i < params->spatial; ++i){
+		int index = batch*filters*params->spatial + filters*params->spatial + i;
+		params->x[index] = (params->x[index] - params->mean[filters])/(sqrt(params->variance[filters]) + .000001f);
+	}
+}
+#endif
+
 void forward_batchnorm_layer(layer l, network_state state)
 {
     if(l.type == BATCHNORM) copy_cpu(l.outputs*l.batch, state.input, 1, l.output, 1);
@@ -139,7 +157,13 @@ void forward_batchnorm_layer(layer l, network_state state)
         normalize_cpu(l.output, l.mean, l.variance, l.batch, l.out_c, l.out_h*l.out_w);   
         copy_cpu(l.outputs*l.batch, l.output, 1, l.x_norm, 1);
     } else {
-        normalize_cpu(l.output, l.rolling_mean, l.rolling_variance, l.batch, l.out_c, l.out_h*l.out_w);
+#ifdef NNPACK
+		struct normalize_params params = { l.output, l.rolling_mean, l.rolling_variance, l.out_h*l.out_w };
+		pthreadpool_compute_2d(state.net.threadpool, (pthreadpool_function_2d_t)normalize_cpu_thread,
+			&params, l.batch, l.out_c);
+#else
+		normalize_cpu(l.output, l.rolling_mean, l.rolling_variance, l.batch, l.out_c, l.out_h*l.out_w);
+#endif
     }
     scale_bias(l.output, l.scales, l.batch, l.out_c, l.out_h*l.out_w);
 }
