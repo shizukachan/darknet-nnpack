@@ -76,41 +76,86 @@ void resize_maxpool_layer(maxpool_layer *l, int w, int h)
     #endif
 }
 
+#ifdef NNPACK
+struct maxpool_params {
+	const maxpool_layer *l;
+	network_state *state;
+};
+
+void maxpool_thread(struct maxpool_params *params, size_t b, size_t k)
+{
+	int i, j, m, n;
+	int w_offset = -params->l->pad;
+	int h_offset = -params->l->pad;
+	int h = params->l->out_h;
+	int w = params->l->out_w;
+	int c = params->l->c;
+
+	for(i = 0; i < h; ++i){
+		for(j = 0; j < w; ++j){
+			int out_index = j + w*(i + h*(k + c*b));
+			float max = -FLT_MAX;
+			int max_i = -1;
+			for(n = 0; n < params->l->size; ++n){
+				for(m = 0; m < params->l->size; ++m){
+					int cur_h = h_offset + i*params->l->stride + n;
+					int cur_w = w_offset + j*params->l->stride + m;
+					int index = cur_w + params->l->w*(cur_h + params->l->h*(k + b*params->l->c));
+					int valid = (cur_h >= 0 && cur_h < params->l->h &&
+								 cur_w >= 0 && cur_w < params->l->w);
+					float val = (valid != 0) ? params->state->input[index] : -FLT_MAX;
+					max_i = (val > max) ? index : max_i;
+					max   = (val > max) ? val   : max;
+				}
+			}
+			params->l->output[out_index] = max;
+			params->l->indexes[out_index] = max_i;
+		}
+	}
+}
+#endif
+
 void forward_maxpool_layer(const maxpool_layer l, network_state state)
 {
-    int b,i,j,k,m,n;
-    int w_offset = -l.pad;
-    int h_offset = -l.pad;
+#ifdef NNPACK
+	struct maxpool_params params = { &l, &state };
+	pthreadpool_compute_2d(state.net.threadpool, (pthreadpool_function_2d_t)maxpool_thread,
+		&params, l.batch, l.c);
+#else
+	int b,i,j,k,m,n;
+	int w_offset = -l.pad;
+	int h_offset = -l.pad;
 
-    int h = l.out_h;
-    int w = l.out_w;
-    int c = l.c;
+	int h = l.out_h;
+	int w = l.out_w;
+	int c = l.c;
 
-    for(b = 0; b < l.batch; ++b){
-        for(k = 0; k < c; ++k){
-            for(i = 0; i < h; ++i){
-                for(j = 0; j < w; ++j){
-                    int out_index = j + w*(i + h*(k + c*b));
-                    float max = -FLT_MAX;
-                    int max_i = -1;
-                    for(n = 0; n < l.size; ++n){
-                        for(m = 0; m < l.size; ++m){
-                            int cur_h = h_offset + i*l.stride + n;
-                            int cur_w = w_offset + j*l.stride + m;
-                            int index = cur_w + l.w*(cur_h + l.h*(k + b*l.c));
-                            int valid = (cur_h >= 0 && cur_h < l.h &&
-                                         cur_w >= 0 && cur_w < l.w);
-                            float val = (valid != 0) ? state.input[index] : -FLT_MAX;
-                            max_i = (val > max) ? index : max_i;
-                            max   = (val > max) ? val   : max;
-                        }
-                    }
-                    l.output[out_index] = max;
-                    l.indexes[out_index] = max_i;
-                }
-            }
-        }
-    }
+	for(b = 0; b < l.batch; ++b){
+		for(k = 0; k < c; ++k){
+			for(i = 0; i < h; ++i){
+				for(j = 0; j < w; ++j){
+					int out_index = j + w*(i + h*(k + c*b));
+					float max = -FLT_MAX;
+					int max_i = -1;
+					for(n = 0; n < l.size; ++n){
+						for(m = 0; m < l.size; ++m){
+							int cur_h = h_offset + i*l.stride + n;
+							int cur_w = w_offset + j*l.stride + m;
+							int index = cur_w + l.w*(cur_h + l.h*(k + b*l.c));
+							int valid = (cur_h >= 0 && cur_h < l.h &&
+										 cur_w >= 0 && cur_w < l.w);
+							float val = (valid != 0) ? state.input[index] : -FLT_MAX;
+							max_i = (val > max) ? index : max_i;
+							max   = (val > max) ? val   : max;
+						}
+					}
+					l.output[out_index] = max;
+					l.indexes[out_index] = max_i;
+				}
+			}
+		}
+	}
+#endif
 }
 
 void backward_maxpool_layer(const maxpool_layer l, network_state state)
