@@ -489,8 +489,8 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
 		get_region_boxes(l, 1, 1, thresh, probs, boxes, 0, 0, hier_thresh);
 		if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         draw_detections(im, l.w*l.h*l.n, thresh, boxes, probs, names, alphabet, l.classes);
-        save_image(im, "predictions");
-        show_image(im, "predictions");
+		save_image(im, "predictions");
+		//show_image(im, "predictions");
 
         free_image(im);
         free_image(sized);

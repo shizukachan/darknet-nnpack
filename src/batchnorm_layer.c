@@ -1,6 +1,9 @@
 #include "batchnorm_layer.h"
 #include "blas.h"
 #include <stdio.h>
+#ifdef NNPACK
+#include <arm_neon.h>
+#endif
 
 layer make_batchnorm_layer(int batch, int w, int h, int c)
 {
@@ -130,9 +133,11 @@ struct normalize_params {
 void normalize_cpu_thread(struct normalize_params *params, size_t batch, size_t filters)
 {
 	int i;
-	for(i = 0; i < params->spatial; ++i){
+	float div = sqrt(params->variance[filters]) + .000001f;
+
+	for(i = 0; i < params->spatial; i++){
 		int index = batch*filters*params->spatial + filters*params->spatial + i;
-		params->x[index] = (params->x[index] - params->mean[filters])/(sqrt(params->variance[filters]) + .000001f);
+		params->x[index] = (params->x[index] - params->mean[filters])/div;
 	}
 }
 #endif
