@@ -461,7 +461,7 @@ void forward_convolutional_layer_nnpack(convolutional_layer l, network_state sta
 	int n = out_h*out_w;
 
 	add_bias(l.output, l.biases, l.batch, l.n, out_h*out_w);
-	activate_array(l.output, l.n*n*l.batch, l.activation);
+	activate_array_thread(l.output, l.n, n, l.activation, state.net.threadpool);
 	if(l.binary || l.xnor) swap_binary(&l);
 }
 #endif

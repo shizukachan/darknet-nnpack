@@ -100,6 +100,28 @@ void activate_array(float *x, const int n, const ACTIVATION a)
     }
 }
 
+#ifdef NNPACK
+struct activate_params {
+	float *x;
+	int n;
+	ACTIVATION a;
+};
+
+void activate_array_compute(struct activate_params *params, size_t c)
+{
+	int i;
+	for (i = 0; i < params->n; i++) {
+		params->x[c*params->n + i] = activate(params->x[c*params->n + i], params->a);
+	}
+}
+
+void activate_array_thread(float *x, const int c, const int n, const ACTIVATION a, pthreadpool_t threadpool)
+{
+	struct activate_params params = { x, n, a };
+	pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t)activate_array_compute, &params, c);
+}
+#endif
+
 float gradient(float x, ACTIVATION a)
 {
     switch(a){

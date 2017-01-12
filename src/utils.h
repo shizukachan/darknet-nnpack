@@ -42,7 +42,7 @@ int constrain_int(int a, int min, int max);
 float mse_array(float *a, int n);
 float rand_normal();
 size_t rand_size_t();
-float rand_uniform(float min, float max);
+inline float rand_uniform(float min, float max);
 float rand_scale(float s);
 int rand_int(int min, int max);
 float sum_array(float *a, int n);

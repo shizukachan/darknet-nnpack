@@ -472,7 +472,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
             input = fgets(input, 256, stdin);
             if(!input) return;
             strtok(input, "\n");
-        }
+		}
         image im = load_image_color(input,0,0);
         image sized = resize_image(im, net.w, net.h);
         layer l = net.layers[net.n-1];
@@ -483,7 +483,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
 
         float *X = sized.data;
 		gettimeofday(&start, 0);
-        network_predict(net, X);
+		network_predict(net, X);
 		gettimeofday(&stop, 0);
 		printf("%s: Predicted in %ld ms.\n", input, (stop.tv_sec * 1000 + stop.tv_usec / 1000) - (start.tv_sec * 1000 + start.tv_usec / 1000));
 		get_region_boxes(l, 1, 1, thresh, probs, boxes, 0, 0, hier_thresh);
@@ -539,18 +539,24 @@ void play_detector(char *datacfg, char *cfgfile, char *weightfile, char *path, f
 	struct dirent **namelist;
 	int n = scandir(path, &namelist, 0, alphasort);
 	int i;
+	int total_time = 0;
+	int count = 0;
+
 	for (i = 0; i < n; i++) {
 		if (!strstr(namelist[i]->d_name, ".jpg")) continue;
 		sprintf(input, "%s/%s", path, namelist[i]->d_name);
 
+		gettimeofday(&start, 0);
 		image im = load_image_color(input,0,0);
 		image sized = resize_image(im, net.w, net.h);
 
 		float *X = sized.data;
-		gettimeofday(&start, 0);
 		network_predict(net, X);
 		gettimeofday(&stop, 0);
-		printf("%s: Predicted in %ld ms.\n", input, (stop.tv_sec * 1000 + stop.tv_usec / 1000) - (start.tv_sec * 1000 + start.tv_usec / 1000));
+		int time = (stop.tv_sec * 1000 + stop.tv_usec / 1000) - (start.tv_sec * 1000 + start.tv_usec / 1000);
+		total_time += time;
+		count++;
+		printf("%s: Predicted in %d ms.\n", input, time);
 		get_region_boxes(l, 1, 1, thresh, probs, boxes, 0, 0, hier_thresh);
 		if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
 		draw_detections(im, l.w*l.h*l.n, thresh, boxes, probs, names, alphabet, l.classes);
@@ -563,6 +569,8 @@ void play_detector(char *datacfg, char *cfgfile, char *weightfile, char *path, f
 #endif
 		free(namelist[i]);
 	}
+
+	printf("Average time: %d ms\n", total_time / count);
 	free(namelist);
 #ifdef NNPACK
 	pthreadpool_destroy(net.threadpool);
