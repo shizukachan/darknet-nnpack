@@ -1101,6 +1101,68 @@ image resize_image(image im, int w, int h)
     return resized;
 }
 
+#ifdef NNPACK
+struct resize_image_params {
+	image im;
+	image resized;
+	image part;
+	int w;
+	int h;
+};
+
+void resize_image_compute_w(struct resize_image_params *params, size_t k, size_t r)
+{
+	int c;
+	float w_scale = (float)(params->im.w - 1) / (params->w - 1);
+
+	for(c = 0; c < params->w; ++c){
+		float val = 0;
+		if(c == params->w-1 || params->im.w == 1){
+			val = get_pixel(params->im, params->im.w-1, r, k);
+		} else {
+			float sx = c*w_scale;
+			int ix = (int) sx;
+			float dx = sx - ix;
+			val = (1 - dx) * get_pixel(params->im, ix, r, k) + dx * get_pixel(params->im, ix+1, r, k);
+		}
+		set_pixel(params->part, c, r, k, val);
+	}
+}
+
+void resize_image_compute_h(struct resize_image_params *params, size_t k, size_t r)
+{
+	int c;
+	float h_scale = (float)(params->im.h - 1) / (params->h - 1);
+
+	float sy = r*h_scale;
+	int iy = (int) sy;
+	float dy = sy - iy;
+	for(c = 0; c < params->w; ++c){
+		float val = (1-dy) * get_pixel(params->part, c, iy, k);
+		set_pixel(params->resized, c, r, k, val);
+	}
+	if(r == params->h-1 || params->im.h == 1) return;
+	for(c = 0; c < params->w; ++c){
+		float val = dy * get_pixel(params->part, c, iy+1, k);
+		add_pixel(params->resized, c, r, k, val);
+	}
+}
+
+image resize_image_thread(image im, int w, int h, pthreadpool_t threadpool)
+{
+	image resized = make_image(w, h, im.c);
+	image part = make_image(w, im.h, im.c);
+
+	struct resize_image_params params = { im, resized, part, w, h };
+	pthreadpool_compute_2d(threadpool, (pthreadpool_function_2d_t)resize_image_compute_w,
+		&params, im.c, im.h);
+	pthreadpool_compute_2d(threadpool, (pthreadpool_function_2d_t)resize_image_compute_h,
+		&params, im.c, h);
+
+	free_image(part);
+	return resized;
+}
+#endif
 
 void test_resize(char *filename)
 {

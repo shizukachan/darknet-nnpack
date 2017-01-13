@@ -548,7 +548,11 @@ void play_detector(char *datacfg, char *cfgfile, char *weightfile, char *path, f
 
 		gettimeofday(&start, 0);
 		image im = load_image_color(input,0,0);
+#ifdef NNPACK
+		image sized = resize_image_thread(im, net.w, net.h, net.threadpool);
+#else
 		image sized = resize_image(im, net.w, net.h);
+#endif
 
 		float *X = sized.data;
 		network_predict(net, X);

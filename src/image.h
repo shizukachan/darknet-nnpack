@@ -7,6 +7,9 @@
 #include <string.h>
 #include <math.h>
 #include "box.h"
+#ifdef NNPACK
+#include <nnpack.h>
+#endif
 
 typedef struct {
     int h;
@@ -30,6 +33,9 @@ image random_crop_image(image im, int w, int h);
 image random_augment_image(image im, float angle, float aspect, int low, int high, int size);
 void random_distort_image(image im, float hue, float saturation, float exposure);
 image resize_image(image im, int w, int h);
+#ifdef NNPACK
+image resize_image_thread(image im, int w, int h, pthreadpool_t threadpool);
+#endif
 image resize_min(image im, int min);
 image resize_max(image im, int max);
 void translate_image(image m, float s);
