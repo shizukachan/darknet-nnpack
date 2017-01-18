@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef NNPACK
+#ifdef ARM_NEON
 #include <arm_neon.h>
 #endif
 
@@ -156,7 +156,7 @@ void axpy_cpu(int N, float ALPHA, float *X, int INCX, float *Y, int INCY)
 void scal_cpu(int N, float ALPHA, float *X, int INCX)
 {
 	int i;
-#ifdef NNPACK
+#ifdef ARM_NEON
 	float32x4_t alpha = vdupq_n_f32(ALPHA);
 	for (i = 0; i < N; i+=4) {
 		vst1q_f32(X + i*INCX, vmulq_f32(vld1q_f32(X + i*INCX), alpha));

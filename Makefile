@@ -2,6 +2,7 @@ GPU=0
 CUDNN=0
 OPENCV=1
 NNPACK=1
+ARM_NEON=1
 DEBUG=0
 
 ARCH= -gencode arch=compute_20,code=[sm_20,sm_21] \
@@ -51,8 +52,13 @@ endif
 
 ifeq ($(NNPACK), 1)
 COMMON+= -DNNPACK
-CFLAGS+= -DNNPACK -mfpu=neon-vfpv4 -funsafe-math-optimizations -ftree-vectorize
+CFLAGS+= -DNNPACK
 LDFLAGS+= -lnnpack
+endif
+
+ifeq ($(ARM_NEON), 1)
+COMMON+= -DARM_NEON
+CFLAGS+= -DARM_NEON -mfpu=neon-vfpv4 -funsafe-math-optimizations -ftree-vectorize
 endif
 
 OBJ=gemm.o utils.o cuda.o convolutional_layer.o list.o image.o activations.o im2col.o col2im.o blas.o crop_layer.o dropout_layer.o maxpool_layer.o softmax_layer.o data.o matrix.o network.o connected_layer.o cost_layer.o parser.o option_list.o darknet.o detection_layer.o captcha.o route_layer.o writing.o box.o nightmare.o normalization_layer.o avgpool_layer.o coco.o dice.o yolo.o detector.o layer.o compare.o classifier.o local_layer.o swag.o shortcut_layer.o activation_layer.o rnn_layer.o gru_layer.o rnn.o rnn_vid.o crnn_layer.o demo.o tag.o cifar.o go.o batchnorm_layer.o art.o region_layer.o reorg_layer.o super.o voxel.o tree.o

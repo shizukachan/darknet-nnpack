@@ -1,9 +1,6 @@
 #include "batchnorm_layer.h"
 #include "blas.h"
 #include <stdio.h>
-#ifdef NNPACK
-#include <arm_neon.h>
-#endif
 
 layer make_batchnorm_layer(int batch, int w, int h, int c)
 {
