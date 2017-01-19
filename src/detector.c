@@ -473,10 +473,11 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
             if(!input) return;
             strtok(input, "\n");
 		}
-        image im = load_image_color(input,0,0);
 #ifdef NNPACK
+		image im = load_image_thread(input, 0, 0, net.c, net.threadpool);
 		image sized = resize_image_thread(im, net.w, net.h, net.threadpool);
 #else
+		image im = load_image_color(input,0,0);
 		image sized = resize_image(im, net.w, net.h);
 #endif
         layer l = net.layers[net.n-1];
