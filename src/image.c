@@ -1213,6 +1213,43 @@ void test_resize(char *filename)
 #endif
 }
 
+#ifdef NNPACK
+struct load_image_params {
+	image im;
+	unsigned char *data;
+	int w;
+	int h;
+	int c;
+};
+
+void load_image_compute(struct load_image_params *params, size_t k, size_t j)
+{
+	int i;
+	for(i = 0; i < params->w; ++i){
+		int dst_index = i + params->w*j + params->w*params->h*k;
+		int src_index = k + params->c*i + params->c*params->w*j;
+		params->im.data[dst_index] = (float)params->data[src_index]/255.;
+	}
+}
+
+image load_image_stb_thread(char *filename, int channels, pthreadpool_t threadpool)
+{
+	int w, h, c;
+	unsigned char *data = stbi_load(filename, &w, &h, &c, channels);
+	if (!data) {
+		fprintf(stderr, "Cannot load image \"%s\"\nSTB Reason: %s\n", filename, stbi_failure_reason());
+		exit(0);
+	}
+
+	if(channels) c = channels;
+	image im = make_image(w, h, c);
+	struct load_image_params params = { im, data, w, h, c };
+	pthreadpool_compute_2d(threadpool, (pthreadpool_function_2d_t)load_image_compute,
+		&params, c, h);
+	free(data);
+	return im;
+}
+#endif
 
 image load_image_stb(char *filename, int channels)
 {
@@ -1224,7 +1261,7 @@ image load_image_stb(char *filename, int channels)
     }
     if(channels) c = channels;
     int i,j,k;
-    image im = make_image(w, h, c);
+	image im = make_image(w, h, c);
     for(k = 0; k < c; ++k){
         for(j = 0; j < h; ++j){
             for(i = 0; i < w; ++i){
@@ -1233,7 +1270,7 @@ image load_image_stb(char *filename, int channels)
                 im.data[dst_index] = (float)data[src_index]/255.;
             }
         }
-    }
+	}
     free(data);
     return im;
 }
@@ -1253,6 +1290,13 @@ image load_image(char *filename, int w, int h, int c)
     }
     return out;
 }
+
+#ifdef NNPACK
+image load_image_thread(char *filename, int w, int h, int c, pthreadpool_t threadpool)
+{
+	return load_image_stb_thread(filename, c, threadpool);
+}
+#endif
 
 image load_image_color(char *filename, int w, int h)
 {

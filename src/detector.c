@@ -474,7 +474,11 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
             strtok(input, "\n");
 		}
         image im = load_image_color(input,0,0);
-        image sized = resize_image(im, net.w, net.h);
+#ifdef NNPACK
+		image sized = resize_image_thread(im, net.w, net.h, net.threadpool);
+#else
+		image sized = resize_image(im, net.w, net.h);
+#endif
         layer l = net.layers[net.n-1];
 
         box *boxes = calloc(l.w*l.h*l.n, sizeof(box));
@@ -504,7 +508,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     }
 #ifdef NNPACK
 	pthreadpool_destroy(net.threadpool);
-	nnp_initialize();
+	nnp_deinitialize();
 #endif
 }
 
@@ -547,10 +551,11 @@ void play_detector(char *datacfg, char *cfgfile, char *weightfile, char *path, f
 		sprintf(input, "%s/%s", path, namelist[i]->d_name);
 
 		gettimeofday(&start, 0);
-		image im = load_image_color(input,0,0);
 #ifdef NNPACK
+		image im = load_image_thread(input, 0, 0, net.c, net.threadpool);
 		image sized = resize_image_thread(im, net.w, net.h, net.threadpool);
 #else
+		image im = load_image_color(input,0,0);
 		image sized = resize_image(im, net.w, net.h);
 #endif
 

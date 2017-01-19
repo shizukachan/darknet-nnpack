@@ -76,6 +76,9 @@ image make_empty_image(int w, int h, int c);
 image float_to_image(int w, int h, int c, float *data);
 image copy_image(image p);
 image load_image(char *filename, int w, int h, int c);
+#ifdef NNPACK
+image load_image_thread(char *filename, int w, int h, int c, pthreadpool_t threadpool);
+#endif
 image load_image_color(char *filename, int w, int h);
 image **load_alphabet();
 
