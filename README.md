@@ -35,6 +35,7 @@ sudo cp third-party/pthreadpool/include/pthreadpool.h /usr/include/
 Build darknet-nnpack
 ```
 git clone https://github.com/thomaspark-pkj/darknet-nnpack.git
+git checkout nnpack
 make
 ```
 
