@@ -50,7 +50,7 @@ Tiny-YOLO
 ## Result
 Model | Build Options | Prediction Time (seconds)
 :-:|:-:|:-:
-YOLO | NNPACK=1,ARM_NEON=1 | 7.37
-YOLO | NNPACK=0,ARM_NEON=0 | 185
-Tiny-YOLO | NNPACK=1,ARM_NEON=1 | 1.78
+YOLO | NNPACK=1,ARM_NEON=1 | 7.7
+YOLO | NNPACK=0,ARM_NEON=0 | 156
+Tiny-YOLO | NNPACK=1,ARM_NEON=1 | 1.8
 Tiny-YOLO | NNPACK=0,ARM_NEON=0 | 38
