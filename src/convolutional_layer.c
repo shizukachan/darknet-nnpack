@@ -451,6 +451,10 @@ void forward_convolutional_layer_nnpack(convolutional_layer l, network net)
 		l.weights,
 		NULL,
 		l.output,
+		NULL,
+		NULL,
+		nnp_activation_identity,
+		NULL,
 		net.threadpool,
 		NULL
 	);

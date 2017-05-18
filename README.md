@@ -3,12 +3,10 @@ NNPACK was used to optimize [Darknet](https://github.com/pjreddie/darknet) witho
 
 ## Build from Raspberry Pi 3
 Log in to Raspberry Pi using SSH.<br/>
-Install [PeachPy](https://github.com/Maratyszcza/PeachPy)
+Install [PeachPy](https://github.com/Maratyszcza/PeachPy) and [confu](https://github.com/Maratyszcza/confu)
 ```
-git clone https://github.com/Maratyszcza/PeachPy.git
-cd PeachPy
-python setup.py build
-sudo python setup.py install
+sudo pip install --upgrade git+https://github.com/Maratyszcza/PeachPy
+sudo pip install --upgrade git+https://github.com/Maratyszcza/confu
 ```
 Install [Ninja](https://ninja-build.org/)
 ```
@@ -21,16 +19,16 @@ Install clang
 ```
 sudo apt-get install clang
 ```
-Install [NNPACK-rpi](https://github.com/thomaspark-pkj/NNPACK-rpi.git)
+Install [NNPACK-darknet](https://github.com/thomaspark-pkj/NNPACK-darknet.git)
 ```
-git clone https://github.com/thomaspark-pkj/NNPACK-rpi.git --recursive
-cd NNPACK-rpi
-git checkout raspberrypi
-python ./configure.py --enable-rpi --enable-shared
+git clone https://github.com/thomaspark-pkj/NNPACK-darknet.git
+cd NNPACK
+confu setup
+python ./configure.py --backend auto
 $NINJA_PATH/ninja
-sudo cp -a lib/libnnpack.* /usr/lib/
+sudo cp -a lib/* /usr/lib/
 sudo cp include/nnpack.h /usr/include/
-sudo cp third-party/pthreadpool/include/pthreadpool.h /usr/include/
+sudo cp deps/pthreadpool/include/pthreadpool.h /usr/include/
 ```
 Build darknet-nnpack
 ```
