@@ -1,8 +1,4 @@
-#include "network.h"
-#include "cost_layer.h"
-#include "utils.h"
-#include "parser.h"
-#include "blas.h"
+#include "darknet.h"
 
 #ifdef OPENCV
 image get_image_from_stream(CvCapture *cap);
@@ -103,8 +99,8 @@ void train_vid_rnn(char *cfgfile, char *weightfile)
         time=clock();
         float_pair p = get_rnn_vid_data(extractor, paths, N, batch, steps);
 
-        memcpy(net.input, p.x, net.inputs*net.batch);
-        memcpy(net.truth, p.y, net.truths*net.batch);
+        copy_cpu(net.inputs*net.batch, p.x, 1, net.input, 1);
+        copy_cpu(net.truths*net.batch, p.y, 1, net.truth, 1);
         float loss = train_network_datum(net) / (net.batch);
 
 

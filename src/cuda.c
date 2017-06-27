@@ -5,7 +5,7 @@ int gpu_index = 0;
 #include "cuda.h"
 #include "utils.h"
 #include "blas.h"
-#include "assert.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -96,6 +96,8 @@ float *cuda_make_array(float *x, size_t n)
     if(x){
         status = cudaMemcpy(x_gpu, x, size, cudaMemcpyHostToDevice);
         check_error(status);
+    } else {
+        fill_gpu(n, 0, x_gpu, 1);
     }
     if(!x_gpu) error("Cuda malloc failed\n");
     return x_gpu;
@@ -128,12 +130,17 @@ float cuda_compare(float *x_gpu, float *x, size_t n, char *s)
     return err;
 }
 
-int *cuda_make_int_array(size_t n)
+int *cuda_make_int_array(int *x, size_t n)
 {
     int *x_gpu;
     size_t size = sizeof(int)*n;
     cudaError_t status = cudaMalloc((void **)&x_gpu, size);
     check_error(status);
+    if(x){
+        status = cudaMemcpy(x_gpu, x, size, cudaMemcpyHostToDevice);
+        check_error(status);
+    }
+    if(!x_gpu) error("Cuda malloc failed\n");
     return x_gpu;
 }
 

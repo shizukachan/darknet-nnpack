@@ -1,6 +1,7 @@
 #include "softmax_layer.h"
 #include "blas.h"
 #include "cuda.h"
+
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
@@ -70,13 +71,17 @@ void forward_softmax_layer_gpu(const softmax_layer l, network net)
             count += group_size;
         }
     } else {
-        softmax_gpu(net.input_gpu, l.inputs/l.groups, l.batch, l.inputs, l.groups, l.inputs/l.groups, 1, l.temperature, l.output_gpu);
+        if(l.spatial){
+            softmax_gpu(net.input_gpu, l.c, l.batch*l.c, l.inputs/l.c, l.w*l.h, 1, l.w*l.h, 1, l.output_gpu);
+        }else{
+            softmax_gpu(net.input_gpu, l.inputs/l.groups, l.batch, l.inputs, l.groups, l.inputs/l.groups, 1, l.temperature, l.output_gpu);
+        }
     }
 }
 
 void backward_softmax_layer_gpu(const softmax_layer layer, network net)
 {
-    axpy_ongpu(layer.batch*layer.inputs, 1, layer.delta_gpu, 1, net.delta_gpu, 1);
+    axpy_gpu(layer.batch*layer.inputs, 1, layer.delta_gpu, 1, net.delta_gpu, 1);
 }
 
 #endif

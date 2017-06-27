@@ -1,12 +1,8 @@
+#include "darknet.h"
+
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-#include "parser.h"
-#include "utils.h"
-#include "cuda.h"
-#include "blas.h"
-#include "connected_layer.h"
 
 extern void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *filename, int top);
 extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
@@ -21,6 +17,7 @@ extern void run_dice(int argc, char **argv);
 extern void run_compare(int argc, char **argv);
 extern void run_classifier(int argc, char **argv);
 extern void run_regressor(int argc, char **argv);
+extern void run_segmenter(int argc, char **argv);
 extern void run_char_rnn(int argc, char **argv);
 extern void run_vid_rnn(int argc, char **argv);
 extern void run_tag(int argc, char **argv);
@@ -115,6 +112,26 @@ void operations(char *cfgfile)
             ops += 2l * l.n * l.size*l.size*l.c * l.out_h*l.out_w;
         } else if(l.type == CONNECTED){
             ops += 2l * l.inputs * l.outputs;
+        } else if (l.type == RNN){
+            ops += 2l * l.input_layer->inputs * l.input_layer->outputs;
+            ops += 2l * l.self_layer->inputs * l.self_layer->outputs;
+            ops += 2l * l.output_layer->inputs * l.output_layer->outputs;
+        } else if (l.type == GRU){
+            ops += 2l * l.uz->inputs * l.uz->outputs;
+            ops += 2l * l.uh->inputs * l.uh->outputs;
+            ops += 2l * l.ur->inputs * l.ur->outputs;
+            ops += 2l * l.wz->inputs * l.wz->outputs;
+            ops += 2l * l.wh->inputs * l.wh->outputs;
+            ops += 2l * l.wr->inputs * l.wr->outputs;
+        } else if (l.type == LSTM){
+            ops += 2l * l.uf->inputs * l.uf->outputs;
+            ops += 2l * l.ui->inputs * l.ui->outputs;
+            ops += 2l * l.ug->inputs * l.ug->outputs;
+            ops += 2l * l.uo->inputs * l.uo->outputs;
+            ops += 2l * l.wf->inputs * l.wf->outputs;
+            ops += 2l * l.wi->inputs * l.wi->outputs;
+            ops += 2l * l.wg->inputs * l.wg->outputs;
+            ops += 2l * l.wo->inputs * l.wo->outputs;
         }
     }
     printf("Floating Point Operations: %ld\n", ops);
@@ -171,7 +188,6 @@ void partial(char *cfgfile, char *weightfile, char *outfile, int max)
     save_weights_upto(net, outfile, max);
 }
 
-#include "convolutional_layer.h"
 void rescale_net(char *cfgfile, char *weightfile, char *outfile)
 {
     gpu_index = -1;
@@ -321,7 +337,7 @@ void denormalize_net(char *cfgfile, char *weightfile, char *outfile)
     int i;
     for (i = 0; i < net.n; ++i) {
         layer l = net.layers[i];
-        if (l.type == CONVOLUTIONAL && l.batch_normalize) {
+        if ((l.type == DECONVOLUTIONAL || l.type == CONVOLUTIONAL) && l.batch_normalize) {
             denormalize_convolutional_layer(l);
             net.layers[i].batch_normalize=0;
         }
@@ -442,6 +458,8 @@ int main(int argc, char **argv)
         run_classifier(argc, argv);
     } else if (0 == strcmp(argv[1], "regressor")){
         run_regressor(argc, argv);
+    } else if (0 == strcmp(argv[1], "segmenter")){
+        run_segmenter(argc, argv);
     } else if (0 == strcmp(argv[1], "art")){
         run_art(argc, argv);
     } else if (0 == strcmp(argv[1], "tag")){

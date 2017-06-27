@@ -1,8 +1,6 @@
-#include "network.h"
-#include "parser.h"
-#include "blas.h"
-#include "utils.h"
-#include "region_layer.h"
+#include "darknet.h"
+
+#include <math.h>
 
 // ./darknet nightmare cfg/extractor.recon.cfg ~/trained/yolo-coco.conv frame6.png -reconstruct -iters 500 -i 3 -lambda .1 -rate .01 -smooth 2
 
@@ -52,7 +50,7 @@ void optimize_picture(network *net, image orig, int max_layer, float scale, floa
     cuda_push_array(net->input_gpu, im.data, net->inputs);
 
     forward_network_gpu(*net);
-    copy_ongpu(last.outputs, last.output_gpu, 1, last.delta_gpu, 1);
+    copy_gpu(last.outputs, last.output_gpu, 1, last.delta_gpu, 1);
 
     cuda_pull_array(last.delta_gpu, last.delta, last.outputs);
     calculate_loss(last.delta, last.delta, last.outputs, thresh);
@@ -132,18 +130,18 @@ void smooth(image recon, image update, float lambda, int num)
 void reconstruct_picture(network net, float *features, image recon, image update, float rate, float momentum, float lambda, int smooth_size, int iters)
 {
     int iter = 0;
-    layer l = get_network_output_layer(net);
     for (iter = 0; iter < iters; ++iter) {
         image delta = make_image(recon.w, recon.h, recon.c);
 
 #ifdef GPU
+        layer l = get_network_output_layer(net);
         cuda_push_array(net.input_gpu, recon.data, recon.w*recon.h*recon.c);
         //cuda_push_array(net.truth_gpu, features, net.truths);
         net.delta_gpu = cuda_make_array(delta.data, delta.w*delta.h*delta.c);
 
         forward_network_gpu(net);
         cuda_push_array(l.delta_gpu, features, l.outputs);
-        axpy_ongpu(l.outputs, -1, l.output_gpu, 1, l.delta_gpu, 1);
+        axpy_gpu(l.outputs, -1, l.output_gpu, 1, l.delta_gpu, 1);
         backward_network_gpu(net);
 
         cuda_pull_array(net.delta_gpu, delta.data, delta.w*delta.h*delta.c);

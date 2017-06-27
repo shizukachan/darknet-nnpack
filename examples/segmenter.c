@@ -1,13 +1,8 @@
-#include "network.h"
-#include "utils.h"
-#include "parser.h"
-#include "option_list.h"
-#include "blas.h"
-#include "assert.h"
-#include "cuda.h"
+#include "darknet.h"
 #include <sys/time.h>
+#include <assert.h>
 
-void train_regressor(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear)
+void train_segmenter(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear, int display)
 {
     int i;
 
@@ -29,10 +24,14 @@ void train_regressor(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
             load_weights(&nets[i], weightfile);
         }
         if(clear) *nets[i].seen = 0;
-        nets[i].learning_rate *= ngpus;
     }
     srand(time(0));
     network net = nets[0];
+    image pred = get_network_image(net);
+
+    int div = net.w/pred.w;
+    assert(pred.w * div == net.w);
+    assert(pred.h * div == net.h);
 
     int imgs = net.batch * net.subdivisions * ngpus;
 
@@ -52,6 +51,7 @@ void train_regressor(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
     args.w = net.w;
     args.h = net.h;
     args.threads = 32;
+    args.scale = div;
 
     args.min = net.min_crop;
     args.max = net.max_crop;
@@ -61,11 +61,12 @@ void train_regressor(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
     args.saturation = net.saturation;
     args.hue = net.hue;
     args.size = net.w;
+    args.classes = 80;
 
     args.paths = paths;
     args.n = imgs;
     args.m = N;
-    args.type = REGRESSION_DATA;
+    args.type = SEGMENTATION_DATA;
 
     data train;
     data buffer;
@@ -94,9 +95,23 @@ void train_regressor(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
 #else
         loss = train_network(net, train);
 #endif
+        if(display){
+            image tr = float_to_image(net.w/div, net.h/div, 80, train.y.vals[net.batch*(net.subdivisions-1)]);
+            image im = float_to_image(net.w, net.h, net.c, train.X.vals[net.batch*(net.subdivisions-1)]);
+            image mask = mask_to_rgb(tr);
+            image prmask = mask_to_rgb(pred);
+            show_image(im, "input");
+            show_image(prmask, "pred");
+            show_image(mask, "truth");
+#ifdef OPENCV
+            cvWaitKey(100);
+#endif
+            free_image(mask);
+            free_image(prmask);
+        }
         if(avg_loss == -1) avg_loss = loss;
         avg_loss = avg_loss*.9 + loss*.1;
-        printf("%d, %.3f: %f, %f avg, %f rate, %lf seconds, %d images\n", get_current_batch(net), (float)(*net.seen)/N, loss, avg_loss, get_current_rate(net), sec(clock()-time), *net.seen);
+        printf("%ld, %.3f: %f, %f avg, %f rate, %lf seconds, %ld images\n", get_current_batch(net), (float)(*net.seen)/N, loss, avg_loss, get_current_rate(net), sec(clock()-time), *net.seen);
         free_data(train);
         if(*net.seen/N > epoch){
             epoch = *net.seen/N;
@@ -120,7 +135,7 @@ void train_regressor(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
     free(base);
 }
 
-void predict_regressor(char *cfgfile, char *weightfile, char *filename)
+void predict_segmenter(char *datafile, char *cfgfile, char *weightfile, char *filename)
 {
     network net = parse_network_cfg(cfgfile);
     if(weightfile){
@@ -148,19 +163,27 @@ void predict_regressor(char *cfgfile, char *weightfile, char *filename)
         float *X = sized.data;
         time=clock();
         float *predictions = network_predict(net, X);
+        image pred = get_network_image(net);
+        image prmask = mask_to_rgb(pred);
+        show_image(sized, "orig");
+        show_image(prmask, "pred");
+#ifdef OPENCV
+        cvWaitKey(0);
+#endif
         printf("Predicted: %f\n", predictions[0]);
         printf("%s: Predicted in %f seconds.\n", input, sec(clock()-time));
         free_image(im);
         free_image(sized);
+        free_image(prmask);
         if (filename) break;
     }
 }
 
 
-void demo_regressor(char *datacfg, char *cfgfile, char *weightfile, int cam_index, const char *filename)
+void demo_segmenter(char *datacfg, char *cfgfile, char *weightfile, int cam_index, const char *filename)
 {
 #ifdef OPENCV
-    printf("Regressor Demo\n");
+    printf("Classifier Demo\n");
     network net = parse_network_cfg(cfgfile);
     if(weightfile){
         load_weights(&net, weightfile);
@@ -177,8 +200,8 @@ void demo_regressor(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
     }
 
     if(!cap) error("Couldn't connect to webcam.\n");
-    cvNamedWindow("Regressor", CV_WINDOW_NORMAL); 
-    cvResizeWindow("Regressor", 512, 512);
+    cvNamedWindow("Segmenter", CV_WINDOW_NORMAL); 
+    cvResizeWindow("Segmenter", 512, 512);
     float fps = 0;
 
     while(1){
@@ -187,7 +210,6 @@ void demo_regressor(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
 
         image in = get_image_from_stream(cap);
         image in_s = letterbox_image(in, net.w, net.h);
-        show_image(in, "Regressor");
 
         float *predictions = network_predict(net, in_s.data);
 
@@ -195,10 +217,13 @@ void demo_regressor(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
         printf("\033[1;1H");
         printf("\nFPS:%.0f\n",fps);
 
-        printf("People: %f\n", predictions[0]);
-
+        image pred = get_network_image(net);
+        image prmask = mask_to_rgb(pred);
+        show_image(prmask, "Segmenter");
+        
         free_image(in_s);
         free_image(in);
+        free_image(prmask);
 
         cvWaitKey(10);
 
@@ -211,7 +236,7 @@ void demo_regressor(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
 }
 
 
-void run_regressor(int argc, char **argv)
+void run_segmenter(int argc, char **argv)
 {
     if(argc < 4){
         fprintf(stderr, "usage: %s %s [train/test/valid] [cfg] [weights (optional)]\n", argv[0], argv[1]);
@@ -243,13 +268,14 @@ void run_regressor(int argc, char **argv)
 
     int cam_index = find_int_arg(argc, argv, "-c", 0);
     int clear = find_arg(argc, argv, "-clear");
+    int display = find_arg(argc, argv, "-display");
     char *data = argv[3];
     char *cfg = argv[4];
     char *weights = (argc > 5) ? argv[5] : 0;
     char *filename = (argc > 6) ? argv[6]: 0;
-    if(0==strcmp(argv[2], "test")) predict_regressor(data, cfg, weights);
-    else if(0==strcmp(argv[2], "train")) train_regressor(data, cfg, weights, gpus, ngpus, clear);
-    else if(0==strcmp(argv[2], "demo")) demo_regressor(data, cfg, weights, cam_index, filename);
+    if(0==strcmp(argv[2], "test")) predict_segmenter(data, cfg, weights, filename);
+    else if(0==strcmp(argv[2], "train")) train_segmenter(data, cfg, weights, gpus, ngpus, clear, display);
+    else if(0==strcmp(argv[2], "demo")) demo_segmenter(data, cfg, weights, cam_index, filename);
 }
 
 

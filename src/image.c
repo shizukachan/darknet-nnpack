@@ -25,6 +25,25 @@ float get_color(int c, int x, int max)
     return r;
 }
 
+image mask_to_rgb(image mask)
+{
+    int n = mask.c;
+    image im = make_image(mask.w, mask.h, 3);
+    int i, j;
+    for(j = 0; j < n; ++j){
+        int offset = j*123457 % n;
+        float red = get_color(2,offset,n);
+        float green = get_color(1,offset,n);
+        float blue = get_color(0,offset,n);
+        for(i = 0; i < im.w*im.h; ++i){
+            im.data[i + 0*im.w*im.h] += mask.data[j*im.h*im.w + i]*red;
+            im.data[i + 1*im.w*im.h] += mask.data[j*im.h*im.w + i]*green;
+            im.data[i + 2*im.w*im.h] += mask.data[j*im.h*im.w + i]*blue;
+        }
+    }
+    return im;
+}
+
 void composite_image(image source, image dest, int dx, int dy)
 {
     int x,y,k;
@@ -180,7 +199,7 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
         float prob = probs[i][class];
         if(prob > thresh){
 
-            int width = im.h * .012;
+            int width = im.h * .006;
 
             if(0){
                 width = pow(prob, 1./2.)*10+1;
@@ -842,6 +861,67 @@ void letterbox_image_into(image im, int w, int h, image boxed)
 }
 
 #ifdef NNPACK
+struct resize_image_params {
+	image im;
+	image resized;
+	image part;
+	int w;
+	int h;
+};
+
+void resize_image_compute_w(struct resize_image_params *params, size_t k, size_t r)
+{
+	int c;
+	float w_scale = (float)(params->im.w - 1) / (params->w - 1);
+
+	for(c = 0; c < params->w; ++c){
+		float val = 0;
+		if(c == params->w-1 || params->im.w == 1){
+			val = get_pixel(params->im, params->im.w-1, r, k);
+		} else {
+			float sx = c*w_scale;
+			int ix = (int) sx;
+			float dx = sx - ix;
+			val = (1 - dx) * get_pixel(params->im, ix, r, k) + dx * get_pixel(params->im, ix+1, r, k);
+		}
+		set_pixel(params->part, c, r, k, val);
+	}
+}
+
+void resize_image_compute_h(struct resize_image_params *params, size_t k, size_t r)
+{
+	int c;
+	float h_scale = (float)(params->im.h - 1) / (params->h - 1);
+
+	float sy = r*h_scale;
+	int iy = (int) sy;
+	float dy = sy - iy;
+	for(c = 0; c < params->w; ++c){
+		float val = (1-dy) * get_pixel(params->part, c, iy, k);
+		set_pixel(params->resized, c, r, k, val);
+	}
+	if(r == params->h-1 || params->im.h == 1) return;
+	for(c = 0; c < params->w; ++c){
+		float val = dy * get_pixel(params->part, c, iy+1, k);
+		add_pixel(params->resized, c, r, k, val);
+	}
+}
+
+image resize_image_thread(image im, int w, int h, pthreadpool_t threadpool)
+{
+	image resized = make_image(w, h, im.c);
+	image part = make_image(w, im.h, im.c);
+
+	struct resize_image_params params = { im, resized, part, w, h };
+	pthreadpool_compute_2d(threadpool, (pthreadpool_function_2d_t)resize_image_compute_w,
+		&params, im.c, im.h);
+	pthreadpool_compute_2d(threadpool, (pthreadpool_function_2d_t)resize_image_compute_h,
+		&params, im.c, h);
+
+	free_image(part);
+	return resized;
+}
+
 image letterbox_image_thread(image im, int w, int h, pthreadpool_t threadpool)
 {
 	int new_w = im.w;
@@ -925,8 +1005,9 @@ image random_crop_image(image im, int w, int h)
     return crop;
 }
 
-image random_augment_image(image im, float angle, float aspect, int low, int high, int size)
+augment_args random_augment_args(image im, float angle, float aspect, int low, int high, int w, int h)
 {
+    augment_args a = {0};
     aspect = rand_scale(aspect);
     int r = rand_int(low, high);
     int min = (im.h < im.w*aspect) ? im.h : im.w*aspect;
@@ -934,15 +1015,27 @@ image random_augment_image(image im, float angle, float aspect, int low, int hig
 
     float rad = rand_uniform(-angle, angle) * TWO_PI / 360.;
 
-    float dx = (im.w*scale/aspect - size) / 2.;
-    float dy = (im.h*scale - size) / 2.;
+    float dx = (im.w*scale/aspect - w) / 2.;
+    float dy = (im.h*scale - w) / 2.;
     if(dx < 0) dx = 0;
     if(dy < 0) dy = 0;
     dx = rand_uniform(-dx, dx);
     dy = rand_uniform(-dy, dy);
 
-    image crop = rotate_crop_image(im, rad, scale, size, size, dx, dy, aspect);
+    a.rad = rad;
+    a.scale = scale;
+    a.w = w;
+    a.h = h;
+    a.dx = dx;
+    a.dy = dy;
+    a.aspect = aspect;
+    return a;
+}
 
+image random_augment_image(image im, float angle, float aspect, int low, int high, int w, int h)
+{
+    augment_args a = random_augment_args(im, angle, aspect, low, high, w, h);
+    image crop = rotate_crop_image(im, a.rad, a.scale, a.w, a.h, a.dx, a.dy, a.aspect);
     return crop;
 }
 
@@ -1297,69 +1390,6 @@ image resize_image(image im, int w, int h)
     return resized;
 }
 
-#ifdef NNPACK
-struct resize_image_params {
-	image im;
-	image resized;
-	image part;
-	int w;
-	int h;
-};
-
-void resize_image_compute_w(struct resize_image_params *params, size_t k, size_t r)
-{
-	int c;
-	float w_scale = (float)(params->im.w - 1) / (params->w - 1);
-
-	for(c = 0; c < params->w; ++c){
-		float val = 0;
-		if(c == params->w-1 || params->im.w == 1){
-			val = get_pixel(params->im, params->im.w-1, r, k);
-		} else {
-			float sx = c*w_scale;
-			int ix = (int) sx;
-			float dx = sx - ix;
-			val = (1 - dx) * get_pixel(params->im, ix, r, k) + dx * get_pixel(params->im, ix+1, r, k);
-		}
-		set_pixel(params->part, c, r, k, val);
-	}
-}
-
-void resize_image_compute_h(struct resize_image_params *params, size_t k, size_t r)
-{
-	int c;
-	float h_scale = (float)(params->im.h - 1) / (params->h - 1);
-
-	float sy = r*h_scale;
-	int iy = (int) sy;
-	float dy = sy - iy;
-	for(c = 0; c < params->w; ++c){
-		float val = (1-dy) * get_pixel(params->part, c, iy, k);
-		set_pixel(params->resized, c, r, k, val);
-	}
-	if(r == params->h-1 || params->im.h == 1) return;
-	for(c = 0; c < params->w; ++c){
-		float val = dy * get_pixel(params->part, c, iy+1, k);
-		add_pixel(params->resized, c, r, k, val);
-	}
-}
-
-image resize_image_thread(image im, int w, int h, pthreadpool_t threadpool)
-{
-	image resized = make_image(w, h, im.c);
-	image part = make_image(w, im.h, im.c);
-
-	struct resize_image_params params = { im, resized, part, w, h };
-	pthreadpool_compute_2d(threadpool, (pthreadpool_function_2d_t)resize_image_compute_w,
-		&params, im.c, im.h);
-	pthreadpool_compute_2d(threadpool, (pthreadpool_function_2d_t)resize_image_compute_h,
-		&params, im.c, h);
-
-	free_image(part);
-	return resized;
-}
-#endif
-
 void test_resize(char *filename)
 {
     image im = load_image(filename, 0,0, 3);
@@ -1385,7 +1415,7 @@ void test_resize(char *filename)
     show_image(c4, "C4");
 #ifdef OPENCV
     while(1){
-        image aug = random_augment_image(im, 0, .75, 320, 448, 320);
+        image aug = random_augment_image(im, 0, .75, 320, 448, 320, 320);
         show_image(aug, "aug");
         free_image(aug);
 

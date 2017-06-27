@@ -31,7 +31,7 @@ static float demo_hier = .5;
 static int running = 0;
 
 static int demo_delay = 0;
-static int demo_frame = 5;
+static int demo_frame = 3;
 static int demo_detections = 0;
 static float **predictions;
 static int demo_index = 0;

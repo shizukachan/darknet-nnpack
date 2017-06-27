@@ -1,6 +1,7 @@
 #include "route_layer.h"
 #include "cuda.h"
 #include "blas.h"
+
 #include <stdio.h>
 
 route_layer make_route_layer(int batch, int n, int *input_layers, int *input_sizes)
@@ -110,7 +111,7 @@ void forward_route_layer_gpu(const route_layer l, network net)
         float *input = net.layers[index].output_gpu;
         int input_size = l.input_sizes[i];
         for(j = 0; j < l.batch; ++j){
-            copy_ongpu(input_size, input + j*input_size, 1, l.output_gpu + offset + j*l.outputs, 1);
+            copy_gpu(input_size, input + j*input_size, 1, l.output_gpu + offset + j*l.outputs, 1);
         }
         offset += input_size;
     }
@@ -125,7 +126,7 @@ void backward_route_layer_gpu(const route_layer l, network net)
         float *delta = net.layers[index].delta_gpu;
         int input_size = l.input_sizes[i];
         for(j = 0; j < l.batch; ++j){
-            axpy_ongpu(input_size, 1, l.delta_gpu + offset + j*l.outputs, 1, delta + j*input_size, 1);
+            axpy_gpu(input_size, 1, l.delta_gpu + offset + j*l.outputs, 1, delta + j*input_size, 1);
         }
         offset += input_size;
     }

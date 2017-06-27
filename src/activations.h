@@ -1,14 +1,8 @@
 #ifndef ACTIVATIONS_H
 #define ACTIVATIONS_H
+#include "darknet.h"
 #include "cuda.h"
 #include "math.h"
-#ifdef NNPACK
-#include <nnpack.h>
-#endif
-
-typedef enum{
-    LOGISTIC, RELU, RELIE, LINEAR, RAMP, TANH, PLSE, LEAKY, ELU, LOGGY, STAIR, HARDTAN, LHTAN
-}ACTIVATION;
 
 ACTIVATION get_activation(char *s);
 
@@ -21,8 +15,8 @@ void activate_array(float *x, const int n, const ACTIVATION a);
 void activate_array_thread(float *x, const int c, const int n, const ACTIVATION a, pthreadpool_t threadpool);
 #endif
 #ifdef GPU
-void activate_array_ongpu(float *x, int n, ACTIVATION a);
-void gradient_array_ongpu(float *x, int n, ACTIVATION a, float *delta);
+void activate_array_gpu(float *x, int n, ACTIVATION a);
+void gradient_array_gpu(float *x, int n, ACTIVATION a, float *delta);
 #endif
 
 static inline float stair_activate(float x)
