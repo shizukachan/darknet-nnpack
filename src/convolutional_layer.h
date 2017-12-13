@@ -31,7 +31,7 @@ void resize_convolutional_layer(convolutional_layer *layer, int w, int h);
 void forward_convolutional_layer_nnpack(const convolutional_layer layer, network net);
 #endif
 #ifdef QPU_GEMM
-void forward_convolutional_layer_nnpack_qpu(const convolutional_layer layer, network net);
+void forward_convolutional_layer_qpu(const convolutional_layer layer, network net);
 #endif
 void forward_convolutional_layer(const convolutional_layer layer, network net);
 void update_convolutional_layer(convolutional_layer layer, update_args a);
