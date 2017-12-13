@@ -30,6 +30,12 @@ cd NNPACK-darknet
 confu setup
 ```
 If you are compiling for the Pi Zero, run `python ./configure.py --backend scalar`, otherwise run `python ./configure.py --backend auto`
+It's also recommended to examine and edit https://github.com/digitalbrain79/NNPACK-darknet/blob/master/src/init.c#L215 to match your CPU architecture:
+Model | L1 cache size | L1 cache associativity | L2 cache size | L2 cache associativity | L2 cache inclusiveness | L2 cache shared threads
+:-:|:-:|:-:|:-:|:-:|:-:|:-:
+BCM2835 | 16*1024 | 4 | 128*1024*1024 | ? | ? | 1
+BCM2837 | 32*1024 | 4 | 512*1024*1024 | 16 | yes (l1i) and no (l1d) | 4
+Since none of the ARM CPUs have a L3, it's recommended to set L3 = L2 -- and also set L3 threads to 1.
 ```
 $NINJA_PATH/ninja
 sudo cp -a lib/* /usr/lib/
