@@ -1111,8 +1111,10 @@ void load_weights_upto(network *net, char *filename, int start, int cutoff)
     fread(&minor, sizeof(int), 1, fp);
     fread(&revision, sizeof(int), 1, fp);
     if ((major*10 + minor) >= 2){
-        fread(net->seen, sizeof(size_t), 1, fp);
+	fprintf(stderr, " (Version 2) ");
+        fread(net->seen, sizeof(uint64_t), 1, fp);
     } else {
+	fprintf(stderr, " (Version 1) ");
         int iseen = 0;
         fread(&iseen, sizeof(int), 1, fp);
         *net->seen = iseen;
