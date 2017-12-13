@@ -216,11 +216,15 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
 
     l.output = calloc(l.batch*l.outputs, sizeof(float));
     l.delta  = calloc(l.batch*l.outputs, sizeof(float));
-#ifdef NNPACK
-	l.forward = forward_convolutional_layer_nnpack;
+#ifdef QPU_GEMM
+	l.forward = forward_convolutional_layer_qpu;
 #else
+ #ifdef NNPACK
+	l.forward = forward_convolutional_layer_nnpack;
+ #else
 	l.forward = forward_convolutional_layer;
-#endif
+ #endif //NNPACK
+#endif //QPU_GEMM
     l.backward = backward_convolutional_layer;
     l.update = update_convolutional_layer;
     if(binary){
@@ -485,6 +489,84 @@ void forward_convolutional_layer_nnpack(convolutional_layer l, network net)
 
 	activate_array_thread(l.output, l.n, n, l.activation, net.threadpool);
 	if(l.binary || l.xnor) swap_binary(&l);
+}
+#endif
+
+#ifdef QPU_GEMM
+void forward_convolutional_layer_qpu(convolutional_layer l, network net)
+{
+    struct timeval t_a, t_b, t_c, t_d, t_e;
+    int i, j;
+
+    fill_cpu(l.outputs*l.batch, 0, l.output, 1);
+
+    if(l.xnor){
+        binarize_weights(l.weights, l.n, l.c/l.groups*l.size*l.size, l.binary_weights);
+        swap_binary(&l);
+        binarize_cpu(net.input, l.c*l.h*l.w*l.batch, l.binary_input);
+        net.input = l.binary_input;
+    }
+
+    int m = l.n/l.groups;
+    int k = l.size*l.size*l.c/l.groups;
+    int n = l.out_w*l.out_h;
+    for(i = 0; i < l.batch; ++i){
+        for(j = 0; j < l.groups; ++j){
+            float *a = l.weights + j*l.nweights/l.groups;
+            //float *b = net.workspace;
+            float *c = l.output + (i*l.groups + j)*n*m;
+
+            //all of the QPU allocations are in _uncached_ memory.
+            //so it's faster to copy data to/from the QPU
+            //instead of allocating it there.
+            float *A = mkl_malloc(m*k*(32/8), 4096);//we could mempool for a tiny speedup
+            float *B = mkl_malloc(k*n*(32/8), 4096);
+            float *C = mkl_malloc(m*n*(32/8), 4096);
+printf("Allocated %d bytes onto GPU\n",m*k*(32/8)+k*n*(32/8)+m*n*(32/8));
+gettimeofday(&t_a,0);
+            im2col_cpu(net.input + (i*l.groups + j)*l.c/l.groups*l.h*l.w,
+                l.c/l.groups, l.h, l.w, l.size, l.stride, l.pad, B);
+gettimeofday(&t_b,0);
+            memcpy(A,a,m*k*(32/8));
+            memcpy(C,c,m*n*(32/8));
+gettimeofday(&t_c,0);
+            gemm_qpu(0,0,m,n,k,1,A,k,B,n,1,C,n);
+gettimeofday(&t_d,0);
+            memcpy(c,C,m*n*(32/8));
+gettimeofday(&t_e,0);
+printf("Copied %d bytes off of GPU\n",m*n*(32/8));
+printf("qpu_gemm im2col_cpu: %d ms\nram->qpu: %d ms\nqpu_gemm gemm: %d ms\nqpu->ram: %d ms\n",
+(t_b.tv_sec * 1000 + t_b.tv_usec / 1000) - (t_a.tv_sec * 1000 + t_a.tv_usec / 1000),
+(t_c.tv_sec * 1000 + t_c.tv_usec / 1000) - (t_b.tv_sec * 1000 + t_b.tv_usec / 1000),
+(t_d.tv_sec * 1000 + t_c.tv_usec / 1000) - (t_c.tv_sec * 1000 + t_c.tv_usec / 1000)
+(t_e.tv_sec * 1000 + t_c.tv_usec / 1000) - (t_d.tv_sec * 1000 + t_d.tv_usec / 1000));
+            mkl_free(A);
+            mkl_free(B);
+            mkl_free(C);
+        }
+    }
+
+#ifdef NNPACK
+    int out_h = convolutional_out_height(l);
+    int out_w = convolutional_out_width(l);
+    n = out_h*out_w;
+    if(l.batch_normalize){
+        forward_batchnorm_layer(l, net);
+    } else {
+       add_bias(l.output, l.biases, l.batch, l.n, out_h*out_w);
+    }
+
+    activate_array_thread(l.output, l.n, n, l.activation, net.threadpool);
+#else
+    if(l.batch_normalize){
+        forward_batchnorm_layer(l, net);
+    } else {
+        add_bias(l.output, l.biases, l.batch, l.n, l.out_h*l.out_w);
+    }
+
+    activate_array(l.output, l.outputs*l.batch, l.activation);
+#endif
+    if(l.binary || l.xnor) swap_binary(&l);
 }
 #endif
 

@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#ifdef QPU_GEMM
+#include "mkl.h"
+#endif
 
 void gemm_bin(int M, int N, int K, float ALPHA, 
         char  *A, int lda, 
@@ -69,6 +72,14 @@ void gemm(int TA, int TB, int M, int N, int K, float ALPHA,
         float *C, int ldc)
 {
     gemm_cpu( TA,  TB,  M, N, K, ALPHA,A,lda, B, ldb,BETA,C,ldc);
+#if 0
+//not confident enough in this - requires allocs to be in GPU memory
+#ifdef QPU_GEMM
+    gemm_qpu( TA,  TB,  M, N, K, ALPHA,A,lda, B, ldb,BETA,C,ldc);
+#else
+    gemm_cpu( TA,  TB,  M, N, K, ALPHA,A,lda, B, ldb,BETA,C,ldc);
+#endif
+#endif
 }
 
 void gemm_nn(int M, int N, int K, float ALPHA, 
@@ -141,6 +152,48 @@ void gemm_tt(int M, int N, int K, float ALPHA,
     }
 }
 
+#ifdef QPU_GEMM
+void gemm_qpu(int TA, int TB, int M, int N, int K, float ALPHA, float *A, int lda, float *B, int ldb, float BETA, float *C, int ldc)
+{
+    printf("qpu: %d %d %d %d %d %f %d %d %f %d\n",TA, TB, M, N, K, ALPHA, lda, ldb, BETA, ldc);
+    if(!TA && !TB)
+	cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasNoTrans,
+		M,N,K,
+		ALPHA,
+		A,K,
+		B,N,
+		BETA,
+		C,N
+	);
+    else if(TA && !TB)
+	cblas_sgemm(CblasRowMajor,CblasTrans,CblasNoTrans,
+		M,N,K,
+		ALPHA,
+		A,K,
+		B,N,
+		BETA,
+		C,N
+	);
+    else if(!TA && TB)
+	cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans,
+		M,N,K,
+		ALPHA,
+		A,K,
+		B,N,
+		BETA,
+		C,N
+	);
+    else
+	cblas_sgemm(CblasRowMajor,CblasTrans,CblasTrans,
+		M,N,K,
+		ALPHA,
+		A,K,
+		B,N,
+		BETA,
+		C,N
+	);
+}
+#endif
 
 void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA, 
         float *A, int lda, 
