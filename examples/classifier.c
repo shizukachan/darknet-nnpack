@@ -552,7 +552,10 @@ void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *fi
     network *net = load_network(cfgfile, weightfile, 0);
     set_batch_network(net, 1);
     srand(2222222);
-
+#ifdef NNPACK
+    nnp_initialize();
+    net->threadpool = pthreadpool_create(4);
+#endif
     list *options = read_data_cfg(datacfg);
 
     char *name_list = option_find_str(options, "names", 0);
@@ -575,10 +578,15 @@ void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *fi
             if(!input) return;
             strtok(input, "\n");
         }
+#ifdef NNPACK
+        image im = load_image_thread(input, 0, 0, net->c, net->threadpool);
+        image r = letterbox_image_thread(im, net->w, net->h, net->threadpool);
+#else
         image im = load_image_color(input, 0, 0);
         image r = letterbox_image(im, net->w, net->h);
         //resize_network(net, r.w, r.h);
         //printf("%d %d\n", r.w, r.h);
+#endif
 
         float *X = r.data;
         time=clock();
@@ -596,6 +604,10 @@ void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *fi
         free_image(im);
         if (filename) break;
     }
+#ifdef NNPACK
+    pthreadpool_destroy(net->threadpool);
+    nnp_deinitialize();
+#endif
 }
 
 

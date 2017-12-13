@@ -133,12 +133,32 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 
     srand(2222222);
 
+#ifdef NNPACK
+	nnp_initialize();
+	net->threadpool = pthreadpool_create(4);
+#endif
+
     if(filename){
         printf("video file: %s\n", filename);
         cap = cvCaptureFromFile(filename);
     }else{
         cap = cvCaptureFromCAM(cam_index);
+	//defaults
+	if (!w)
+            cvSetCaptureProperty(cap, CV_CAP_PROP_FRAME_WIDTH, 640);
+	else
+            cvSetCaptureProperty(cap, CV_CAP_PROP_FRAME_WIDTH, w);
 
+	if (!h)
+            cvSetCaptureProperty(cap, CV_CAP_PROP_FRAME_HEIGHT, 360);
+	else
+            cvSetCaptureProperty(cap, CV_CAP_PROP_FRAME_HEIGHT, h);
+
+	if (!frames)
+            cvSetCaptureProperty(cap, CV_CAP_PROP_FPS, 7);
+	else
+            cvSetCaptureProperty(cap, CV_CAP_PROP_FPS, frames);
+/*
         if(w){
             cvSetCaptureProperty(cap, CV_CAP_PROP_FRAME_WIDTH, w);
         }
@@ -148,6 +168,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
         if(frames){
             cvSetCaptureProperty(cap, CV_CAP_PROP_FPS, frames);
         }
+*/
     }
 
     if(!cap) error("Couldn't connect to webcam.\n");
@@ -178,7 +199,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
             cvSetWindowProperty("Demo", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
         } else {
             cvMoveWindow("Demo", 0, 0);
-            cvResizeWindow("Demo", 1352, 1013);
+            cvResizeWindow("Demo", 800, 480);
+//            cvResizeWindow("Demo", 1352, 1013);
         }
     }
 
@@ -201,6 +223,10 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
         pthread_join(detect_thread, 0);
         ++count;
     }
+#ifdef NNPACK
+	pthreadpool_destroy(net->threadpool);
+	nnp_deinitialize();
+#endif
 }
 
 void demo_compare(char *cfg1, char *weight1, char *cfg2, char *weight2, float thresh, int cam_index, const char *filename, char **names, int classes, int delay, char *prefix, int avg_frames, float hier, int w, int h, int frames, int fullscreen)

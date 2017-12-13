@@ -649,6 +649,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
 	pthreadpool_destroy(net->threadpool);
 	nnp_deinitialize();
 #endif
+	free_network(net);
 }
 
 void run_detector(int argc, char **argv)
