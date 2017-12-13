@@ -134,8 +134,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
     srand(2222222);
 
 #ifdef NNPACK
-	nnp_initialize();
-	net->threadpool = pthreadpool_create(4);
+    nnp_initialize();
+    net->threadpool = pthreadpool_create(4);
 #endif
 
     if(filename){
@@ -223,9 +223,10 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
         pthread_join(detect_thread, 0);
         ++count;
     }
+    free_network(net);
 #ifdef NNPACK
-	pthreadpool_destroy(net->threadpool);
-	nnp_deinitialize();
+    pthreadpool_destroy(net->threadpool);
+    nnp_deinitialize();
 #endif
 }
 
