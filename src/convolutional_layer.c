@@ -538,7 +538,7 @@ printf("Copied %d bytes off of GPU\n",m*n*(32/8));
 printf("qpu_gemm im2col_cpu: %d ms\nram->qpu: %d ms\nqpu_gemm gemm: %d ms\nqpu->ram: %d ms\n",
 (t_b.tv_sec * 1000 + t_b.tv_usec / 1000) - (t_a.tv_sec * 1000 + t_a.tv_usec / 1000),
 (t_c.tv_sec * 1000 + t_c.tv_usec / 1000) - (t_b.tv_sec * 1000 + t_b.tv_usec / 1000),
-(t_d.tv_sec * 1000 + t_c.tv_usec / 1000) - (t_c.tv_sec * 1000 + t_c.tv_usec / 1000)
+(t_d.tv_sec * 1000 + t_c.tv_usec / 1000) - (t_c.tv_sec * 1000 + t_c.tv_usec / 1000),
 (t_e.tv_sec * 1000 + t_c.tv_usec / 1000) - (t_d.tv_sec * 1000 + t_d.tv_usec / 1000));
             mkl_free(A);
             mkl_free(B);
