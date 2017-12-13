@@ -84,7 +84,7 @@ Tiny-YOLO | NNPACK=0,ARM_NEON=0 | 38
 
 ## NNPACK+QPU_GEMM Results
 Raspberry Pi | Model | Build Options | Prediction Time (seconds)
-:-:|:-:|:-:
+:-:|:-:|:-:|:-:
 Pi 3 | Tiny-YOLO | NNPACK=1,ARM_NEON=1,QPU_GEMM=1 | 5.3
 
 The QPU is slower than NNPACK-NEON. qmkl is just unable to match the performance NNPACK's extremely well tuned NEON implicit GEMM.
