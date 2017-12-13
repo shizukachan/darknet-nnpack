@@ -41,7 +41,7 @@ Install [qmkl](https://github.com/Idein/qmkl)
 ```
 sudo apt-get install cmake
 git clone https://github.com/Idein/qmkl.git
-cd qmkl/
+cd qmkl
 cmake .
 make
 sudo make install
@@ -50,12 +50,16 @@ sudo make install
 Install [qasm2](https://github.com/Terminus-IMRC/qpu-assembler2)
 ```
 sudo apt-get install flex
+git clone https://github.com/Terminus-IMRC/qpu-assembler2
+cd qpu-assembler2
 make
 sudo make install
 ```
 
 Install [qbin2hex](https://github.com/Terminus-IMRC/qpu-bin-to-hex)
 ```
+git clone https://github.com/Terminus-IMRC/qpu-bin-to-hex
+cd qpu-bin-to-hex
 make
 sudo make install
 ```
@@ -78,7 +82,7 @@ YOLOv2 | NNPACK=0,ARM_NEON=0 | 156
 Tiny-YOLO | NNPACK=1,ARM_NEON=1 | 1.3
 Tiny-YOLO | NNPACK=0,ARM_NEON=0 | 38
 
-## NNPACK+QPU_GEMM Results (Raspberry Pi 3)
+## NNPACK+QPU_GEMM Results
 Raspberry Pi | Model | Build Options | Prediction Time (seconds)
 :-:|:-:|:-:
 Pi 3 | Tiny-YOLO | NNPACK=1,ARM_NEON=1,QPU_GEMM=1 | 5.3
