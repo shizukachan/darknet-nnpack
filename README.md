@@ -90,9 +90,40 @@ Tiny-YOLO | NNPACK=1,ARM_NEON=1 | 1.3
 Tiny-YOLO | NNPACK=0,ARM_NEON=0 | 38
 
 ## NNPACK+QPU_GEMM Results
+All NNPACK=1 results use march=native, and pthreadpool is initialized for one thread for the Pi Zero, and mcpu=cortex-a53 for the Pi 3.
+
+I used these NNPACK cache tunings for the Pi 3:
+```
+L1 size: 32k / associativity: 4 / thread: 1
+L2 size: 480k / associativity: 16 / thread: 4 / inclusive: false
+L3 size: 480k / associativity: 16 / thread: 1 / inclusive: false
+This should yield l1.size=32, l2.size=120, and l3.size=120 after NNPACK init is run.
+```
+And these for the Pi Zero:
+L1 size: 16k / associativity: 4 / thread: 1
+L2 size: 128k / associativity: 4 / thread: 1 / inclusive: false
+L3 size: 128k / associativity: 4 / thread: 1 / inclusive: false
+This should yield l1.size=16, l2.size=128, and l3.size=128 after NNPACK init is run.
+```
+Even though the Pi Zero's L2 is attached to the QPU and almost as slow as main memory, it does seem to have a small benefit.
+
 Raspberry Pi | Model | Build Options | Prediction Time (seconds)
 :-:|:-:|:-:|:-:
-Pi 3 | Tiny-YOLO | NNPACK=1,ARM_NEON=1,QPU_GEMM=1 | 5.3
+Pi 3 | Tiny-YOLO | NNPACK=1,ARM_NEON=1,QPU_GEMM=1 mcpu=cortex-a53 | 5.3
+Pi Zero | Tiny-YOLO | NNPACK=1,QPU_GEMM=1 l1=16k,l2/3=128k | 7.7
+Pi Zero | Tiny-YOLO | NNPACK=1,QPU_GEMM=0 l1=16k,l2/3=128k | 28.2
+Pi Zero | Tiny-YOLO | NNPACK=1,QPU_GEMM=0 l1/2/3=16k | 29.9
+Pi Zero | Tiny-YOLO | NNPACK=0,QPU_GEMM=0 | 124
+Pi Zero | Tiny-YOLO | NNPACK=0,QPU_GEMM=1 | 8.0
+Pi Zero | Darknet19 | NNPACK=1,QPU_GEMM=1 l1=16k,l2/3=128k | 3.3
+Pi Zero | Darknet19 | NNPACK=1,QPU_GEMM=0 l1=16k,l2/3=128k | 22.3
+Pi Zero | Darknet19 | NNPACK=1,QPU_GEMM=0 l1/2/3=16k | 23.2
+Pi Zero | Darknet19 | NNPACK=0,QPU_GEMM=1 | 3.5
+Pi Zero | Darknet19 | NNPACK=0,QPU_GEMM=0 | 96.3
+Pi Zero | Darknet | NNPACK=1,QPU_GEMM=1 l1=16k,l2/3=128k | 1.23
+Pi Zero | Darknet | NNPACK=1,QPU_GEMM=0 l1=16k,l2/3=128k | 4.15
+Pi Zero | Darknet | NNPACK=0,QPU_GEMM=1 | 1.32
+Pi Zero | Darknet | NNPACK=0,QPU_GEMM=0 | 14.9
 
 The QPU is slower than NNPACK-NEON. qmkl is just unable to match the performance NNPACK's extremely well tuned NEON implicit GEMM.
 I imagine the best use case for this repo would be to run neural networks on Raspberry Pi's without NEON.
