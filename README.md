@@ -100,6 +100,7 @@ L3 size: 480k / associativity: 16 / thread: 1 / inclusive: false
 This should yield l1.size=32, l2.size=120, and l3.size=120 after NNPACK init is run.
 ```
 And these for the Pi Zero:
+```
 L1 size: 16k / associativity: 4 / thread: 1
 L2 size: 128k / associativity: 4 / thread: 1 / inclusive: false
 L3 size: 128k / associativity: 4 / thread: 1 / inclusive: false
