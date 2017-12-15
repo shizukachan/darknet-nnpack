@@ -129,3 +129,7 @@ Pi Zero | Darknet | NNPACK=0,QPU_GEMM=0 | 14.9
 
 The QPU is slower than NNPACK-NEON. qmkl is just unable to match the performance NNPACK's extremely well tuned NEON implicit GEMM.
 I imagine the best use case for this repo would be to run neural networks on Raspberry Pi's without NEON.
+
+## GPU / config.txt considerations
+Using the QPU requires memory set aside for the GPU. Using the command `sudo vcdbg reloc` you can see how much memory is free on the GPU - it's roughly 20MB less than what is specified by gpu_mem.
+I recommend no less than 80MB if you want to run Tiny-YOLO/Darknet19/Darknet. It's important to note that if the program segfaults before GPU memory is freed, it's lost forever until the Pi is rebooted.
