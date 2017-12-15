@@ -579,7 +579,11 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     float nms=.3;
 #ifdef NNPACK
 	nnp_initialize();
-	net->threadpool = pthreadpool_create(4);
+ #ifdef QPU_GEMM
+    net->threadpool = pthreadpool_create(1);
+ #else
+    net->threadpool = pthreadpool_create(4);
+ #endif
 #endif
 
     while(1){

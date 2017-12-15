@@ -554,7 +554,11 @@ void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *fi
     srand(2222222);
 #ifdef NNPACK
     nnp_initialize();
+ #ifdef QPU_GEMM
+    net->threadpool = pthreadpool_create(1);
+ #else
     net->threadpool = pthreadpool_create(4);
+ #endif
 #endif
     list *options = read_data_cfg(datacfg);
 

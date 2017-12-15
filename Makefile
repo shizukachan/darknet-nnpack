@@ -1,11 +1,11 @@
 GPU=0
 CUDNN=0
-OPENCV=1
+OPENCV=0
 NNPACK=1
 ARM_NEON=0
 OPENMP=0
 DEBUG=0
-QPU_GEMM=0
+QPU_GEMM=1
 
 ARCH= -gencode arch=compute_30,code=sm_30 \
       -gencode arch=compute_35,code=sm_35 \
@@ -30,8 +30,8 @@ OPTS=-Ofast
 LDFLAGS= -lm -pthread 
 COMMON= -Iinclude/ -Isrc/
 #CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC
-CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC -march=native -mfpmath=sse
-#CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC -mcpu=cortex-a53
+#CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC -march=native -mfpmath=sse
+CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC -march=native
 
 ifeq ($(OPENMP), 1) 
 CFLAGS+= -fopenmp

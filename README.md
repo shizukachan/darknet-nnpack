@@ -4,10 +4,11 @@ Forked from https://github.com/digitalbrain79/darknet-nnpack/
 NNPACK was used to optimize [Darknet](https://github.com/pjreddie/darknet) without using a GPU. It is useful for embedded devices using ARM CPUs.
 Idein's [qmkl](https://github.com/Idein/qmkl) is also used to accelerate the SGEMM using the GPU. This is slower than NNPACK on NEON-capable devices, and primarily useful for ARM CPUs without NEON.
 
-## Build from Raspberry Pi 3
+## Build Instructions
 Log in to Raspberry Pi using SSH.<br/>
 Install [PeachPy](https://github.com/Maratyszcza/PeachPy) and [confu](https://github.com/Maratyszcza/confu)
 ```
+sudo apt-get install python-pip
 sudo pip install --upgrade git+https://github.com/Maratyszcza/PeachPy
 sudo pip install --upgrade git+https://github.com/Maratyszcza/confu
 ```
@@ -128,4 +129,3 @@ Pi Zero | Darknet | NNPACK=0,QPU_GEMM=0 | 14.9
 
 The QPU is slower than NNPACK-NEON. qmkl is just unable to match the performance NNPACK's extremely well tuned NEON implicit GEMM.
 I imagine the best use case for this repo would be to run neural networks on Raspberry Pi's without NEON.
-
