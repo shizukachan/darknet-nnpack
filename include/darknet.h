@@ -113,6 +113,17 @@ typedef struct network network;
 struct layer;
 typedef struct layer layer;
 
+#ifdef NNPACK
+struct nnpack_data
+{
+  int nnpack_initialized;
+  size_t nnpack_workspace_size;
+  void *nnpack_workspace;
+  size_t nnpack_computed_kernel_size;
+  void *nnpack_computed_kernel;
+} typedef nnpack_data;
+#endif
+
 struct layer{
     LAYER_TYPE type;
     ACTIVATION activation;
@@ -249,7 +260,7 @@ struct layer{
 
     float * m;
     float * v;
-    
+
     float * bias_m;
     float * bias_v;
     float * scale_m;
@@ -274,7 +285,7 @@ struct layer{
     float *g_cpu;
     float *o_cpu;
     float *c_cpu;
-    float *dc_cpu; 
+    float *dc_cpu;
 
     float * binary_input;
 
@@ -301,7 +312,7 @@ struct layer{
 
     struct layer *input_h_layer;
     struct layer *state_h_layer;
-	
+
     struct layer *wz;
     struct layer *uz;
     struct layer *wr;
@@ -320,7 +331,9 @@ struct layer{
     tree *softmax_tree;
 
     size_t workspace_size;
-
+#ifdef NNPACK
+    struct nnpack_data *nnpack_state;
+#endif
 #ifdef GPU
     int *indexes_gpu;
 
@@ -341,7 +354,7 @@ struct layer{
     float *g_gpu;
     float *o_gpu;
     float *c_gpu;
-    float *dc_gpu; 
+    float *dc_gpu;
 
     float *m_gpu;
     float *v_gpu;

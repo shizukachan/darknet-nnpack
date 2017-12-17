@@ -122,15 +122,15 @@ static size_t get_workspace_size(layer l){
 #ifdef CUDNN
 void cudnn_convolutional_setup(layer *l)
 {
-    cudnnSetTensor4dDescriptor(l->dsrcTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, l->batch, l->c, l->h, l->w); 
-    cudnnSetTensor4dDescriptor(l->ddstTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, l->batch, l->out_c, l->out_h, l->out_w); 
+    cudnnSetTensor4dDescriptor(l->dsrcTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, l->batch, l->c, l->h, l->w);
+    cudnnSetTensor4dDescriptor(l->ddstTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, l->batch, l->out_c, l->out_h, l->out_w);
 
-    cudnnSetTensor4dDescriptor(l->srcTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, l->batch, l->c, l->h, l->w); 
-    cudnnSetTensor4dDescriptor(l->dstTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, l->batch, l->out_c, l->out_h, l->out_w); 
-    cudnnSetTensor4dDescriptor(l->normTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, l->out_c, 1, 1); 
+    cudnnSetTensor4dDescriptor(l->srcTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, l->batch, l->c, l->h, l->w);
+    cudnnSetTensor4dDescriptor(l->dstTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, l->batch, l->out_c, l->out_h, l->out_w);
+    cudnnSetTensor4dDescriptor(l->normTensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, l->out_c, 1, 1);
 
-    cudnnSetFilter4dDescriptor(l->dweightDesc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, l->n, l->c/l->groups, l->size, l->size); 
-    cudnnSetFilter4dDescriptor(l->weightDesc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, l->n, l->c/l->groups, l->size, l->size); 
+    cudnnSetFilter4dDescriptor(l->dweightDesc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, l->n, l->c/l->groups, l->size, l->size);
+    cudnnSetFilter4dDescriptor(l->weightDesc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, l->n, l->c/l->groups, l->size, l->size);
     #if CUDNN_MAJOR >= 6
     cudnnSetConvolution2dDescriptor(l->convDesc, l->pad, l->pad, l->stride, l->stride, 1, 1, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT);
     #else
@@ -221,6 +221,7 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
 #else
  #ifdef NNPACK
 	l.forward = forward_convolutional_layer_nnpack;
+  l.nnpack_state = calloc(sizeof(nnpack_data),1);
  #else
 	l.forward = forward_convolutional_layer;
  #endif //NNPACK
@@ -449,34 +450,178 @@ void backward_bias(float *bias_updates, float *delta, int batch, int n, int size
 }
 
 #ifdef NNPACK
+//#define DEBUG_NNPACK
 void forward_convolutional_layer_nnpack(convolutional_layer l, network net)
 {
 	struct nnp_size input_size = { l.w, l.h };
 	struct nnp_padding input_padding = { l.pad, l.pad, l.pad, l.pad };
 	struct nnp_size kernel_size = { l.size, l.size };
 	struct nnp_size stride = { l.stride, l.stride };
-
-	nnp_convolution_inference(
-		nnp_convolution_algorithm_implicit_gemm,
-		nnp_convolution_transform_strategy_tuple_based,
-		l.c,
-		l.n,
-		input_size,
-		input_padding,
-		kernel_size,
-		stride,
-		net.input,
-		l.weights,
-		NULL,
-		l.output,
-		NULL,
-		NULL,
-		nnp_activation_identity,
-		NULL,
-		net.threadpool,
-		NULL
-	);
-
+	int nnp_status = 0;
+#ifdef DEBUG_NNPACK
+	printf("nnpack convolution: %dx%d, in=%d, out=%d, kernel=%d\n",l.w,l.h,l.c,l.n,l.size);
+#endif
+	if (l.nnpack_state->nnpack_initialized == 0)
+	{
+		nnp_status = nnp_convolution_inference(
+			nnp_convolution_algorithm_auto,
+			nnp_convolution_transform_strategy_precompute,
+			l.c,
+			l.n,
+			input_size,
+			input_padding,
+			kernel_size,
+			stride,
+			NULL,//net.input (input)
+			NULL,//l.weights (kernel)
+			NULL,//? (bias)
+			NULL,//l.output (output)
+			NULL,//workspace_buffer, need to be NULL
+			&l.nnpack_state->nnpack_computed_kernel_size,
+			nnp_activation_identity,
+			NULL,
+			net.threadpool,
+			NULL
+		);
+		if (nnp_status==nnp_status_unsupported_transform_strategy)
+		{
+#ifdef DEBUG_NNPACK
+			printf("can't use fast convolution\n");
+#endif
+			l.nnpack_state->nnpack_initialized = 2;
+		}
+		else if (nnp_status==nnp_status_success)
+		{
+      if (l.nnpack_state->nnpack_computed_kernel_size>256*1024*1024)
+      {
+#ifdef DEBUG_NNPACK
+        printf("Precomputed kernel consumes too much memory: %d bytes\n",l.nnpack_state->nnpack_computed_kernel_size);
+#endif
+  			l.nnpack_state->nnpack_initialized = 3;
+      }
+      else
+      {
+  			l.nnpack_state->nnpack_computed_kernel = aligned_alloc(64,l.nnpack_state->nnpack_computed_kernel_size);
+#ifdef DEBUG_NNPACK
+        printf("Precomputed kernel: %d bytes, aligned addr %llx\n",l.nnpack_state->nnpack_computed_kernel_size,l.nnpack_state->nnpack_computed_kernel);
+#endif
+      }
+		}
+		else
+		{
+			printf("NNPACK error! (%d)\n", nnp_status);
+		}
+	}
+  if (l.nnpack_state->nnpack_initialized==3) //low memory conv algorithm
+	{
+		nnp_status=nnp_convolution_inference(
+			nnp_convolution_algorithm_implicit_gemm,
+			nnp_convolution_transform_strategy_tuple_based,
+			l.c,
+			l.n,
+			input_size,
+			input_padding,
+			kernel_size,
+			stride,
+			net.input,
+			l.weights,
+			NULL,
+			l.output,
+			NULL,
+			NULL,
+			nnp_activation_identity,
+			NULL,
+			net.threadpool,
+			NULL
+		);
+    if (nnp_status!=nnp_status_success)
+      printf("NNPACK error! (%d)\n", nnp_status);
+	}
+	else if (l.nnpack_state->nnpack_initialized==2) //slow conv algorithm
+	{
+		nnp_status=nnp_convolution_inference(
+			nnp_convolution_algorithm_auto,
+			nnp_convolution_transform_strategy_tuple_based,
+			l.c,
+			l.n,
+			input_size,
+			input_padding,
+			kernel_size,
+			stride,
+			net.input,
+			l.weights,
+			NULL,
+			l.output,
+			NULL,
+			NULL,
+			nnp_activation_identity,
+			NULL,
+			net.threadpool,
+			NULL
+		);
+    if (nnp_status!=nnp_status_success)
+      printf("NNPACK error! (%d)\n", nnp_status);
+	}
+	else if (l.nnpack_state->nnpack_initialized==0) //NOT PRECOMPUTED YET
+	{
+#ifdef DEBUG_NNPACK
+puts("Computing initial kernel transform");
+#endif
+		nnp_status=nnp_convolution_inference(
+			nnp_convolution_algorithm_auto,
+			nnp_convolution_transform_strategy_precompute,
+			l.c,
+			l.n,
+			input_size,
+			input_padding,
+			kernel_size,
+			stride,
+			net.input,
+			l.weights,
+			NULL,
+			l.output,
+			l.nnpack_state->nnpack_computed_kernel,
+			&l.nnpack_state->nnpack_computed_kernel_size,
+			nnp_activation_identity,
+			NULL,
+			net.threadpool,
+			NULL
+		);
+    if (nnp_status!=nnp_status_success)
+      printf("NNPACK error! (%d)\n", nnp_status);
+		l.nnpack_state->nnpack_initialized=1;
+	}
+  if (l.nnpack_state->nnpack_initialized==1) //kernels have been pre-computed
+	{
+#ifdef DEBUG_NNPACK
+printf("Reusing kernel of size %d at %llx\n",l.nnpack_state->nnpack_computed_kernel_size,l.nnpack_state->nnpack_computed_kernel);
+#endif
+		nnp_status=nnp_convolution_inference(
+			nnp_convolution_algorithm_auto,
+			nnp_convolution_transform_strategy_reuse,
+			l.c,
+			l.n,
+			input_size,
+			input_padding,
+			kernel_size,
+			stride,
+			net.input,
+      l.nnpack_state->nnpack_computed_kernel,
+			NULL,
+			l.output,
+      NULL,
+      NULL,
+			nnp_activation_identity,
+			NULL,
+			net.threadpool,
+			NULL
+		);
+    if (nnp_status!=nnp_status_success)
+      printf("NNPACK error! (%d)\n", nnp_status);
+	}
+#ifdef DEBUG_NNPACK
+puts("");
+#endif
 	int out_h = convolutional_out_height(l);
 	int out_w = convolutional_out_width(l);
 	int n = out_h*out_w;
@@ -631,7 +776,7 @@ void backward_convolutional_layer(convolutional_layer l, network net)
 
             float *im = net.input+(i*l.groups + j)*l.c/l.groups*l.h*l.w;
 
-            im2col_cpu(im, l.c/l.groups, l.h, l.w, 
+            im2col_cpu(im, l.c/l.groups, l.h, l.w,
                     l.size, l.stride, l.pad, b);
             gemm(0,1,m,n,k,1,a,k,b,k,1,c,n);
 
@@ -642,7 +787,7 @@ void backward_convolutional_layer(convolutional_layer l, network net)
 
                 gemm(1,0,n,k,m,1,a,n,b,k,0,c,k);
 
-                col2im_cpu(net.workspace, l.c/l.groups, l.h, l.w, l.size, l.stride, 
+                col2im_cpu(net.workspace, l.c/l.groups, l.h, l.w, l.size, l.stride,
                     l.pad, net.delta + (i*l.groups + j)*l.c/l.groups*l.h*l.w);
             }
         }
@@ -733,4 +878,3 @@ image *visualize_convolutional_layer(convolutional_layer l, char *window, image 
     free_image(dc);
     return single_weights;
 }
-
