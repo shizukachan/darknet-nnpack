@@ -135,7 +135,11 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 
 #ifdef NNPACK
     nnp_initialize();
+ #ifdef QPU_GEMM
+    net->threadpool = pthreadpool_create(1);
+ #else
     net->threadpool = pthreadpool_create(4);
+ #endif
 #endif
 
     if(filename){
