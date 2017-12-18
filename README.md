@@ -37,7 +37,9 @@ Model   | L1 cache size | L1 cache associativity | L2 cache size | L2 cache asso
 BCM2835 | 16*1024       | 4                      | 128*1024      | ?                      | ?                      | n/a (single core)
 BCM2837 | 32*1024       | 4                      | 512*1024      | 16                     | yes (l1i) and no (l1d) | 4
 ```
-Since none of the ARM CPUs have a L3, it's recommended to set L3 = L2, set inclusive=false, and also set L3 threads to 1. This should lead to the L2 size being set equal to the L3 size.
+Since none of the ARM CPUs have a L3, it's [recommended](https://github.com/Maratyszcza/NNPACK/issues/33) to set L3 = L2, set inclusive=false, and also set L3 threads to 1. This should lead to the L2 size being set equal to the L3 size.
+
+Ironically, after some trial and error, I've found that setting L3 to an arbitrary 2MB seems to work pretty well.
 ```
 $NINJA_PATH/ninja
 sudo cp -a lib/* /usr/lib/
@@ -97,8 +99,8 @@ I used these NNPACK cache tunings for the Pi 3:
 ```
 L1 size: 32k / associativity: 4 / thread: 1
 L2 size: 480k / associativity: 16 / thread: 4 / inclusive: false
-L3 size: 480k / associativity: 16 / thread: 1 / inclusive: false
-This should yield l1.size=32, l2.size=120, and l3.size=120 after NNPACK init is run.
+L3 size: 2016k / associativity: 16 / thread: 1 / inclusive: false
+This should yield l1.size=32, l2.size=120, and l3.size=2016 after NNPACK init is run.
 ```
 And these for the Pi Zero:
 ```
@@ -135,16 +137,12 @@ It is possible to precompute the kernel to accelerate subsequent inferences. The
 Model | Build Options | Prediction Time (seconds)
 :-:|:-:|:-:
 Tiny-YOLO | NNPACK=1,ARM_NEON=1,NNPACK_FAST=0 | 1.2
-Tiny-YOLO | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.5 (first frame), 0.89 (subsequent frames)
+Tiny-YOLO | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.4 (first frame), 0.82 (subsequent frames)
 Darknet19 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=0 | 0.93
-Darknet19 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.3 (first frame), 0.69 (subsequent frames)
+Darknet19 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.3 (first frame), 0.66 (subsequent frames)
 
 ## GPU / config.txt considerations
 Using the QPU requires memory set aside for the GPU. Using the command `sudo vcdbg reloc` you can see how much memory is free on the GPU - it's roughly 20MB less than what is specified by gpu_mem.
 
 I recommend no less than gpu_mem=80 if you want to run Tiny-YOLO/Darknet19/Darknet. The code I've used tries to keep GPU allocations to a minimum, but if Darknet crashes before GPU memory is freed, it will be gone until a reboot.
 
-## GPU / config.txt considerations
-Using the QPU requires memory set aside for the GPU. Using the command `sudo vcdbg reloc` you can see how much memory is free on the GPU - it's roughly 20MB less than what is specified by gpu_mem.
-
-I recommend no less than gpu_mem=80 if you want to run Tiny-YOLO/Darknet19/Darknet. The code I've used tries to keep GPU allocations to a minimum, but if Darknet crashes before GPU memory is freed, it will be gone until a reboot.
