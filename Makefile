@@ -2,7 +2,8 @@ GPU=0
 CUDNN=0
 OPENCV=1
 NNPACK=1
-ARM_NEON=0
+NNPACK_FAST=1
+ARM_NEON=1
 OPENMP=0
 DEBUG=0
 QPU_GEMM=0
@@ -30,8 +31,8 @@ OPTS=-Ofast
 LDFLAGS= -lm -pthread 
 COMMON= -Iinclude/ -Isrc/
 #CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC
-CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC -march=native -mfpmath=sse
-#CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC -mcpu=cortex-a53
+#CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC -march=native -mfpmath=sse
+CFLAGS=-Wall -Wno-unknown-pragmas -Wfatal-errors -fPIC -mcpu=cortex-a53
 
 ifeq ($(OPENMP), 1) 
 CFLAGS+= -fopenmp
@@ -72,6 +73,11 @@ ifeq ($(NNPACK), 1)
 COMMON+= -DNNPACK
 CFLAGS+= -DNNPACK
 LDFLAGS+= -lnnpack -lpthreadpool
+endif
+
+ifeq ($(NNPACK_FAST), 1)
+COMMON+= -DNNPACK_FAST
+CFLAGS+= -DNNPACK_FAST
 endif
 
 ifeq ($(ARM_NEON), 1)

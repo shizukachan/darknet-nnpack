@@ -458,6 +458,28 @@ void forward_convolutional_layer_nnpack(convolutional_layer l, network net)
 	struct nnp_size kernel_size = { l.size, l.size };
 	struct nnp_size stride = { l.stride, l.stride };
 	int nnp_status = 0;
+#ifndef NNPACK_FAST
+	nnp_convolution_inference(
+		nnp_convolution_algorithm_implicit_gemm,
+		nnp_convolution_transform_strategy_tuple_based,
+		l.c,
+		l.n,
+		input_size,
+		input_padding,
+		kernel_size,
+		stride,
+		net.input,
+		l.weights,
+		NULL,
+		l.output,
+		NULL,
+		NULL,
+		nnp_activation_identity,
+		NULL,
+		net.threadpool,
+		NULL
+	);
+#else
 #ifdef DEBUG_NNPACK
 	printf("nnpack convolution: %dx%d, in=%d, out=%d, kernel=%d\n",l.w,l.h,l.c,l.n,l.size);
 #endif
@@ -622,6 +644,7 @@ printf("Reusing kernel of size %d at %llx\n",l.nnpack_state->nnpack_computed_ker
 #ifdef DEBUG_NNPACK
 puts("");
 #endif
+#endif /* NNPACK_FAST */
 	int out_h = convolutional_out_height(l);
 	int out_w = convolutional_out_width(l);
 	int n = out_h*out_w;
