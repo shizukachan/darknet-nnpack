@@ -12,6 +12,19 @@ void free_layer(layer l)
 #endif
         return;
     }
+#ifdef NNPACK
+    if (l.type == CONVOLUTIONAL)
+    {
+      if (l.nnpack_state)
+      {
+        if (l.nnpack_state->nnpack_workspace)
+          free(l.nnpack_state->nnpack_workspace);
+        if (l.nnpack_state->nnpack_computed_kernel)
+          free(l.nnpack_state->nnpack_computed_kernel);
+        free(l.nnpack_state);
+      }
+    }
+#endif
     if(l.cweights)           free(l.cweights);
     if(l.indexes)            free(l.indexes);
     if(l.input_layers)       free(l.input_layers);
