@@ -241,15 +241,20 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
 
     for(i = 0; i < num; ++i){
         char labelstr[4096] = {0};
+        char str2float[8] = {0};
         int class = -1;
         for(j = 0; j < classes; ++j){
             if (probs[i][j] > thresh){
                 if (class < 0) {
                     strcat(labelstr, names[j]);
+                    sprintf(str2float," %.0f%%",(probs[i][j])*100+0.5f);
+                    strcat(labelstr, str2float);
                     class = j;
                 } else {
                     strcat(labelstr, ", ");
                     strcat(labelstr, names[j]);
+                    sprintf(str2float," %.0f%%",(probs[i][j])*100+0.5f);
+                    strcat(labelstr, str2float);
                 }
                 printf("%s: %.0f%%\n", names[j], probs[i][j]*100);
             }
@@ -507,7 +512,7 @@ void rgbgr_image(image im)
 void show_image_cv(image p, const char *name, IplImage *disp)
 {
     int x,y,k;
-    if(p.c == 3) rgbgr_image(p);
+    if(p.c == 3) rgbgr_image(p); //what the fuck. we run rgbgr on capture and rgbgr on display?
     //normalize_image(copy);
 
     char buff[256];
@@ -629,6 +634,7 @@ image get_image_from_stream(CvCapture *cap)
     return im;
 }
 
+#ifdef ORIG_CODE
 int fill_image_from_stream(CvCapture *cap, image im)
 {
     IplImage* src = cvQueryFrame(cap);
@@ -637,6 +643,34 @@ int fill_image_from_stream(CvCapture *cap, image im)
     rgbgr_image(im);
     return 1;
 }
+#else
+static float avg_latency_opencv = 100.0f;
+int fill_image_from_stream(CvCapture *cap, image im)
+{
+    struct timeval t_a, t_b;
+    int latency;
+    int skip_count=-1;
+    do
+    {
+        gettimeofday(&t_a,0);
+        int discard = cvGrabFrame(cap);
+        if (!discard) return 0;
+        gettimeofday(&t_b,0);
+        latency=(t_b.tv_sec * 1000 + t_b.tv_usec / 1000) - (t_a.tv_sec * 1000 + t_a.tv_usec / 1000);
+        skip_count++;
+        if (skip_count>6) //get out of jail free card for poor avg_latency_opencv initialization
+            avg_latency_opencv = 0.9*avg_latency_opencv + 0.1*latency;
+    } while (latency < avg_latency_opencv/2);
+    avg_latency_opencv = 0.9*avg_latency_opencv + 0.1*latency;
+//    printf("lowlatency_fill_image_from_stream: skip %d, %d ms cur, %.1f ms avg\n",skip_count,latency,avg_latency_opencv);
+    IplImage *src = cvRetrieveFrame(cap,0);
+//    IplImage* src = cvQueryFrame(cap);
+    if (!src) return 0;
+    ipl_into_image(src, im);
+    rgbgr_image(im);
+    return 1;
+}
+#endif
 
 void save_image_jpg(image p, const char *name)
 {
