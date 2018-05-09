@@ -290,11 +290,11 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
         pthread_join(detect_thread, 0);
         ++count;
     }
-    free_network(net);
 #ifdef NNPACK
     pthreadpool_destroy(net->threadpool);
     nnp_deinitialize();
 #endif
+    free_network(net);
 }
 
 /*
