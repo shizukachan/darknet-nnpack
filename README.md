@@ -101,6 +101,7 @@ For non-implicit-GEMM convolution computation, it is possible to precompute the 
 
 System | Model | Build Options | Prediction Time (seconds)
 :-:|:-:|:-:|:-:
+Pi 3 | YOLOv3-Tiny VOC | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.1 (first frame), 0.73 (subsequent frames)
 Pi 3 | Tiny-YOLO | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.4 (first frame), 0.82 (subsequent frames)
 Pi 3 | Tiny-YOLO | NNPACK=1,ARM_NEON=1,NNPACK_FAST=0 | 1.2
 Pi 3 | Darknet19 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.3 (first frame), 0.66 (subsequent frames)
