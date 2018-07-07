@@ -276,8 +276,8 @@ void forward_batchnorm_layer_gpu(layer l, network net)
         normalize_gpu(l.output_gpu, l.rolling_mean_gpu, l.rolling_variance_gpu, l.batch, l.out_c, l.out_h*l.out_w);
         scale_bias_gpu(l.output_gpu, l.scales_gpu, l.batch, l.out_c, l.out_h*l.out_w);
         add_bias_gpu(l.output_gpu, l.biases_gpu, l.batch, l.out_c, l.out_w*l.out_h);
-    }
 #endif
+    }
 }
 
 void backward_batchnorm_layer_gpu(layer l, network net)
