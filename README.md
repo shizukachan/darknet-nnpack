@@ -101,17 +101,22 @@ For non-implicit-GEMM convolution computation, it is possible to precompute the 
 
 System | Model | Build Options | Prediction Time (seconds)
 :-:|:-:|:-:|:-:
-Pi 3 | YOLOv3-Tiny VOC | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.1 (first frame), 0.73 (subsequent frames)
+Pi 3 | YOLOv3-Tiny VOC | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.1 (first frame), 0.73 (subsequent frames) / yolov3 branch
 Pi 3 | Tiny-YOLO | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.4 (first frame), 0.82 (subsequent frames)
 Pi 3 | Tiny-YOLO | NNPACK=1,ARM_NEON=1,NNPACK_FAST=0 | 1.2
-Pi 3 | Darknet19 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.3 (first frame), 0.66 (subsequent frames)
-Pi 3 | Darknet19 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=0 | 0.93
+Pi 3 | Darknet 224x224 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 1.3 (first frame), 0.66 (subsequent frames)
+Pi 2B2 | Darknet 224x224 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 2.0 (first frame), 0.92 (subsequent frames) / yolov3 branch
+Pi 3 | Darknet 224x224 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=0 | 0.93
+Pi 2B2 | Darknet19 256x256 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 7.0 (first frame), 3.9 (subsequent frames) / yolov3 branch
+Pi 2B2 | Darknet19 224x224 | NNPACK=1,ARM_NEON=1,NNPACK_FAST=1 | 6.4 (first frame), 3.3 (subsequent frames) / yolov3 branch
 i5-3320M | Tiny-YOLO | NNPACK=1,NNPACK_FAST=1 | 0.27 (first frame), 0.17 (subsequent frames)
 i5-3320M | Tiny-YOLO | NNPACK=1,NNPACK_FAST=0 | 0.42
 i5-3320M | Tiny-YOLO | NNPACK=0, no OpenMP | 1.4
 i5-3320M | YOLOv2 | NNPACK=1,NNPACK_FAST=1 | 0.98 (first frame), 0.69 (subsequent frames)
 i5-3320M | YOLOv2 | NNPACK=1,NNPACK_FAST=0 | 1.4
 i5-3320M | YOLOv2 | NNPACK=0, no OpenMP | 5.5
+
+Apparently cfg files have changed with yolov3 update, so benchmarks may be out of date, ie. classifier network input size.
 
 On the Intel chip, using transformed GEMM is always faster, even with precomputation on the first frame, than implicit-GEMM. On the Pi 3, implicit-GEMM is faster on the first frame. This suggests that memory bandwidth may be a limiting factor on the Pi 3.
 
